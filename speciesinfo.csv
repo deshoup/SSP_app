@@ -1,0 +1,189 @@
+Species Code,Species Name
+98,No fish in sample
+100,Black Bass Spp.
+101,Largemouth Bass
+102,Florida Largemouth Bass
+103,Florida X Largemouth Bass Hybrid
+104,Spotted Bass
+105,Smallmouth Bass
+106,White Crappie
+107,Black Crappie
+108,Crappie Spp.
+109,White Bass (Sand Bass)
+110,Striped Bass (Striper)
+111,Striped Bass X White Bass Hybrid
+112,Walleye
+113,Sauger
+114,Channel Catfish
+115,Blue Catfish
+116,Northern Pike
+117,Grass Pickerel
+118,Chain Pickerel
+119,Muskellunge
+120,Rainbow Trout
+121,Northern Largemouth Bass
+122,Albino Catfish
+123,Catfish Spp.
+124,Yellow Bass
+125,Predatory Game Fish
+126,Saugeye
+127,Brown Trout
+128,White Perch
+201,Bluegill Sunfish
+202,Longear Sunfish
+203,Orangespotted Sunfish
+204,Redear Sunfish
+205,Green Sunfish
+206,Rock Bass
+207,Warmouth
+208,Redbreast Sunfish
+209,Hybrid Sunfish
+210,Sunfish Spp.
+211,Shadow Bass
+212,Dollar Sunfish
+213,Spotted Sunfish
+214,Bantam Sunfish
+215,Non-predatory Game Fish
+216,Flier
+300,Non-predatory Food Fish
+301,Common Carp
+302,Freshwater Drum
+303,Smallmouth Buffalo
+304,Bigmouth Buffalo
+305,Black Buffalo
+306,River Carpsucker
+307,Highfin Carpsucker
+308,Yellow Bullhead
+309,Brown Bullhead
+310,Black Bullhead
+311,White Sucker
+312,Blue Sucker
+313,Creek Chubsucker
+314,Northern Hogsucker
+315,Spotted Sucker
+316,River Redhorse
+317,Black Redhorse
+318,Golden Redhorse
+319,Shorthead Redhorse
+320,Paddlefish - all sexes
+320.1,Paddlefish - Male
+320.2,Paddlefish - Female
+321,Shovelnose Sturgeon
+322,Tilapia Spp.
+323,White Amur (Grass Carp)
+324,Carp X Goldfish Hybrid
+325,Quillback Carpsucker
+326,Redhorse Spp.
+327,Grass X Bighead Carp
+328,Lake Chubsucker
+330,Buffalo Spp.
+331,Striped Mullet
+401,Flathead Catfish
+402,Longnose Gar
+403,Shortnose Gar
+404,Spotted Gar
+405,Alligator Gar
+406,Bowfin
+407,Gar Spp.
+408,Yellow Perch
+410,Predatory Food Fish
+499,Flathead Catfish Obs.
+501,Gizzard Shad
+502,Threadfin Shad
+503,Goldeye
+504,Mooneye
+505,Inland Silverside
+506,Brook Silverside
+507,Golden Shiner
+508,Bluntnose Minnow
+509,Fathead Minnow
+510,Bullhead Minnow
+511,Planis Killifish
+512,Blackstripe Topminnow
+513,Blackspotted Topminnow
+514,Plains Topminnow
+515,Mosquitofish (Gambusia)
+516,Banded Sculpin
+517,Logperch
+518,Scaly Sand Darter
+519,Crystal Darter
+520,Greenside Darter
+521,Bluntnose Darter
+522,Arkansas Darter
+523,Fantail Darter
+524,Slough Darter
+525,Least Darter
+526,Johnny Darter
+527,Cypress Darter
+528,Stippled Darter
+529,Orangebelly Darter
+530,Orangethroat Darter
+531,Speckled Darter
+532,Redfin Darter
+533,Banded Darter
+534,Channel Darter
+535,Blackside Darter
+536,Longnose Darter
+537,Leopard Darter
+538,Slenderhead Darter
+539,Dusky Darter
+540,River Darter
+541,Stoneroller Spp.
+542,Ozark Minnow
+543,Silver Minnow
+544,Plains Minnow
+545,Speckled Chub
+546,Bigeye Chub
+547,Flathead Chub
+548,Silver Chub
+549,Redspot Chub
+550,Creek Chub
+551,Pallid Shiner
+552,Emerald Shiner
+553,Blackspot Shiner
+554,Red River Shiner
+555,River Shiner
+556,Bigeye Shiner
+557,Ghost Shiner
+558,Blunt Face Shiner
+559,Common Shiner
+560,Pugnose Minnow
+561,Lythrurus Spp.
+562,Arkansas River Shiner
+563,Wedgespot Shiner
+564,Red Shiner
+565,Kiamichi Shiner
+566,Duskystripe Shiner
+567,Chub Shiner
+568,Rosyface Shiner
+569,Spotfin Shiner
+570,Sand Shiner
+571,Redfin Shiner
+572,Blacktail Shiner
+573,Mimic Shiner
+574,Steelcolor Shiner
+575,Suckermouth Shiner
+576,Hybognathus Spp.
+577,Hybogsis Spp.
+578,Notropis Spp.
+579,Pemephales Spp.
+580,Etheostoma Spp.
+581,Shad Spp.
+582,Minnow Spp.
+583,Skipjack Herring
+584,Slim Minnow
+585,Silversides Spp.
+586,All Shad Combined
+587,Rudd
+588,Gravel Chub
+589,Percina Spp.
+590,Prey Fish and Minnows
+591,Luxilus Spp.
+592,Fundulus Spp.
+593,Western Sand Darter
+594,Chub Spp.
+595,Lamprey Spp.
+596,American Eel
+597,Madtom Spp.
+598,Cavefish Spp.
+599,Exotic/Aquarium Fish

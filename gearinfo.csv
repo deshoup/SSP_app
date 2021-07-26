@@ -1,0 +1,30 @@
+Gear Code,Gear Name,Gear Family
+10,Shoreline Seine,Sein
+21,Gill Net - Experimental (Old),Gillnet
+22,Gill Net - Other,Gillnet
+23,Gill Net - Experimental (Current),Gillnet
+25.1,Gill Net - 3/8 - 1 inch Floating,Gillnet
+25,Gill Net - 3/8 - 3/4 inch Floating,Gillnet
+26,Gill Net - Paddlefish,Gillnet
+31,Trap Net - Crappie,Trapnet
+31.1,Trap Net - Standard,Trapnet
+32,Trap Net - Other,Trapnet
+33,Hoop Net,Trapnet
+41,Electrofishing - All Species,Electrofishing
+41.1,Electrofishing  - Spring (All),Electrofishing
+42.1,"Electrofishing - Bass, Crappie, Sunfish",Electrofishing
+42.2,Electrofishing - Fall (All),Electrofishing
+44.02,Electrofishing - bass random,Electrofishing
+43.1,"Electrofishing - Bass, Crappie ",Electrofishing
+43.2,"Electrofishing - Spring (bass, crappie only)",Electrofishing
+44.01,Electrofishing - bass fixed,Electrofishing
+44,Electrofishing - Bass,Electrofishing
+43.3,"Electrofishing - Fall (Bass, crappie only)",Electrofishing
+45,"Electrofishing - Bass, Sunfish",Electrofishing
+46,"Electrofishing - Bass, Perch",Electrofishing
+47,"Electrofishing - Bass, Shad",Electrofishing
+48,Electrofishing - Sunfish,Electrofishing
+49.1,Electrofishing - Summer (Bass only),Electrofishing
+49,Electrofishing - Perch,Electrofishing
+98,Electrofishing - flathead/blue catfish,Electrofishing
+98.1,Electrofishing  -flathead catfish,Electrofishing
