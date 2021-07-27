@@ -6,10 +6,11 @@ library(FSA)
 library(nnet)
 library(nlstools)  
 library(tibble)
+library(bslib) #adds theme engine with theme picker
 
 #.csv's to read in#############################################
-#mainData <- read.csv("Main_database_name_abrev.csv")#just used by Dan for testing purposes (speeds things up)
-mainData <- read.csv("Main_database_name.csv")
+mainData <- read.csv("Main_database_name_abrev.csv")#just used by Dan for testing purposes (speeds things up)
+#mainData <- read.csv("Main_database_name.csv")
 gearinfo <- read.csv("gearinfo.csv")
 lakeinfo <- read.csv("lakeinfo.csv")
 yearmonthinfo <- read.csv("yearmonthinfo.csv")
@@ -20,22 +21,37 @@ agedata <- read.csv("compiledagedata.csv")
 stockingData <- read.csv("stockingdata.csv")
 #percentileData <- read.csv("E:/ODWC Shiny stuff/Oklahoma Fishery Analysis Application/PercentileData.csv")#Loading this down with the percentile tab to save loading time
 SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","memorable","trophy"),sortOrder=c(1,2,3,4,5,6,7))
-    #above creates table with psd size classes and a sort order variable to use for sorting PSD by size rather than alphabetical
+    #above creates table with psd size classes and a sort order variable to use for sorting PSD by size rather 
+    #than alphabetical.  Note first size class is blank so it can be used to sort the "total" category first (i.e.,
+    #when reporting CPUE by size class, this allows total CPUE to be first, then substock CPUE, stock, etc.)
 
-###############################################################
-#Select Sample tab code
-###############################################################
+
   function(input, output, session) {
+    
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Select Sample tab code##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    #bs_themer() #adds bslib theme selecter
     
     #hide red "Loading Data" when .csv's are loaded
       hide(id = "loading-content", anim = TRUE, animType = "fade")
     #Adds ability to upload files greater than 5 MB (max now 100 MB)
       options(shiny.maxRequestSize=100*1024^2)
+    
+    #Server-side processing of selectize boxes
+      observe({updateSelectizeInput(session, "selectlake", choices = lakeinfo$Lake.Code, server = TRUE)})
+      observe({updateSelectizeInput(session, "selectyear", choices = yearmonthinfo$Year, server = TRUE)})
+      observe({updateSelectizeInput(session, "selectmonth", choices = yearmonthinfo$Month, server = TRUE)})
+      observe({updateSelectizeInput(session, "selectgear", choices = gearinfo$Gear.Code, server = TRUE)})
+      
+      observe({updateSelectizeInput(session, "selectlakename", choices = sort.default(lakeinfo$Lake.Name), server = TRUE)})
+      observe({updateSelectizeInput(session, "selectyearname", choices = yearmonthinfo$Year, server = TRUE)})
+      observe({updateSelectizeInput(session, "selectmonthname", choices = yearmonthinfo$Month, server = TRUE)})
+      observe({updateSelectizeInput(session, "selectgearname", choices = sort.default(gearinfo$Gear.Name), server = TRUE)})
       
     #Create selected data table for catch analysis using input from user in the selectizeInput boxes (no species selected) 
       
       #filter data from the selectizeInput values
-      
           selData <- reactive({
             if(input$loadCheck == FALSE){
               selData <- mainData 
@@ -65,10 +81,8 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
               selData
             }
           })
-    
 
-
-  #create final selected data table and download button####
+  ##create final selected data table and download button####
     #output selected data table
         output$selectedDataTable <- DT::renderDataTable({
                   withProgress(message = "Filtering Database", min=0,max=10,value=1,{
@@ -87,12 +101,12 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
           }
         )
   
-  #Functions to grab codes from names and vice versa and syncing selection boxes for codes/names####
+  ##Functions to grab codes from names and vice versa and syncing selection boxes for codes/names####
     #codes to names
       lakename <- function(){
         lake <- as.data.frame(as.character(input$selectlake))
         colnames(lake) <- "Lake.Code"
-        lake <- plyr::join(lake,lakeinfo,by="Lake.Code")
+        lake <- left_join(lake,lakeinfo,by="Lake.Code")
         lakename <- as.character(lake[,2])
       }
       yearname <- function(){
@@ -107,20 +121,8 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         gear <- plyr::join(gear,gearinfo,by="Gear.Code")
         gearname <- as.character(gear[,2])
       }
-      gearnameperc <- function(){  #this is used to cross-populate code/name in percentile tab
-        gear <- as.data.frame(as.character(input$selPercGear))
-        colnames(gear) <- "Gear.Code"
-        gear <- plyr::join(gear,gearinfo,by="Gear.Code")
-        gearname <- as.character(gear[,2])
-      }
       speciesname <- function(){
         species <- as.data.frame(as.character(input$selectspecies))
-        colnames(species) <- "Species.Code"
-        species <- plyr::join(species,speciesinfo,by="Species.Code")
-        speciesname <- as.character(species[,2])
-      }
-      sppnameperc <- function(){
-        species <- as.data.frame(as.character(input$selPercSpp))
         colnames(species) <- "Species.Code"
         species <- plyr::join(species,speciesinfo,by="Species.Code")
         speciesname <- as.character(species[,2])
@@ -142,38 +144,27 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       gearcode <- function(){
         gear <- as.data.frame(as.character(input$selectgearname))
         colnames(gear) <- "Gear.Name"
-        gear <- plyr::join(gear,gearinfo,by="Gear.Name")
-        gearcode <- as.character(gear[,2])
-      }
-      gearcodeperc <- function(){  #this is used to cross-populate code/name in percentile tab
-        gear <- as.data.frame(as.character(input$selPercGearNm))
-        colnames(gear) <- "Gear.Name"
-        gear <- plyr::join(gear,gearinfo,by="Gear.Name")
+        gear <- left_join(gear,gearinfo,by="Gear.Name")
         gearcode <- as.character(gear[,2])
       }
       speciescode <- function(){
         species <- as.data.frame(as.character(input$selectspeciesname))
         colnames(species) <- "Species.Name"
-        species <- plyr::join(species,speciesinfo,by="Species.Name")
-        speciescode <- as.character(species[,2])
-      }
-      speciescodeperc <- function(){
-        species <- as.data.frame(as.character(input$selPercSppNm))
-        colnames(species) <- "Species.Name"
-        species <- plyr::join(species,speciesinfo,by="Species.Name")
+        species <- left_join(species,speciesinfo,by="Species.Name")
         speciescode <- as.character(species[,2])
       }
       availyear <- function(){
         availyear <- sort.default(unique(selData()$Year))
       }
   
-      #Update selectize inputs when either name or code is used
+      #Update selectize inputs to names when boxes with codes get a new value
       observe({
         updateSelectizeInput(session, "selectlakename", selected = lakename())
         updateSelectizeInput(session, "selectyearname", selected = yearname())
         updateSelectizeInput(session, "selectmonthname", selected = monthname())
         updateSelectizeInput(session, "selectgearname", selected = gearname())
        })
+      #Update selectize inputs to codes when boxes with names get a new value
       observe({
         updateSelectizeInput(session, "selectlake", selected = lakecode())
         updateSelectizeInput(session, "selectyear", selected = yearcode())
@@ -181,7 +172,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         updateSelectizeInput(session, "selectgear", selected = gearcode())
       })
       
-  #Summarize selected data in center  box####
+  ##Summarize selected data in center  box####
     #Provide reference for full lake and gear names to right of selectize inputs (Data Selection Tab)
     output$lakename <- renderText({lakename()})
     output$year <- renderText({yearname()})
@@ -195,49 +186,53 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     })
 
 
-
-###############################################################
-#Select Types of Analyses tab 
-###############################################################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Select Types of Analyses tab ##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
-  ###Create dynamic UI's for species selection that populate with options available from selected sample####
+  ##Create dynamic UI's for species selection that populate with options available from selected sample####
     
-    #Species code selection box built here (server.r) so only values matching selected sample are in drop down list 
-        output$speciesselection <- renderUI({
-          withProgress(message = "Loading Data", min=0,max=10,value=1, {
+    #SSP data Species code selection box using server-side choices processing to match available spp
+      observe({
+        withProgress(message = "Loading Species Options Data", min=0,max=10,value=1, {
           callspecies <- sort.default(unique(selData()$Species.Code))
-          selectizeInput("selectspecies", "Select Species Code:", choices = callspecies,
-                         multiple = TRUE, options = list(placeholder = "click/type here"))
-          })
+            updateSelectizeInput(session, "selectspecies", choices = callspecies,
+              server = TRUE)
         })
+      })
     
-    #Species name selection box built here (server.r) so only values matching selected sample are in drop down list
-      output$speciesnameselection <- renderUI({
+    #SSP data Species name selection box using server-side choices processing to match available spp
+      observe({
         withProgress(message = "Loading Data", min=0,max=10,value=1, {
+          #below is more efficient (and uses dplyr rather than plyr) but I'm going back to old to debug some errors
+          # callspecies <- as.data.frame(unique(selData()$Species.Code))
+          # colnames(callspecies) <- "Species.Code"
+          # callspecies <- as.character(unlist(left_join(callspecies,speciesinfo,by="Species.Code") %>% 
+          #                     select(Species.Name)))
           callspecies <- unique(selData()$Species.Code)
           callspecies <- as.data.frame(as.character(callspecies))
           colnames(callspecies) <- "Species.Code"
           callspecies <- plyr::join(callspecies,speciesinfo,by="Species.Code")
           callspecies <- as.character(callspecies[,2])
-          selectizeInput("selectspeciesname", "Select Species Name:", choices = callspecies,
-                         multiple = TRUE, options = list(placeholder = "click/type here"))
+          updateSelectizeInput(session, "selectspeciesname", choices = callspecies,
+                server = TRUE)
         })
       })
     
-    #observe functions to update either species code or name depending on which input is selected (creates matching value in the other box)
+    #observe functions to fill spp name in box when spp code is entered
       observe({
         updateSelectizeInput(session, "selectspeciesname", selected = speciesname())
       })
-      
+    #Observer function to fill spp code in box when spp name is entered
       observe({
         updateSelectizeInput(session, "selectspecies", selected = speciescode())
       })
       
-    #Create selected data table for single species analysis on Select Analysis tab
+    #Create selected SSP data table for single species analysis on Select Analysis tab
       selDataspp <- reactive({
         selDataspp <- selData()[selData()$Species.Code == input$selectspecies,]
         selDataspp <- selDataspp[rep(row.names(selDataspp), selDataspp$Number.of.individuals),]
-        #Above line repeats each row by number of times in Number of individuals column
+            #Above line repeats each row by number of times in Number of individuals column
       })
       
     # Create downloadable csv of selected species dataset
@@ -250,40 +245,75 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
           }
         )
       
-    #Age data - species selection box built here (server.r) so only values matching selected sample are in drop down list
-      output$selagespp <- renderUI({
+    #Age data - species selection box choices and default value set to species selected for SSP data at top of page
+      observe({
         withProgress(message = "Loading Data",min=0,max=10,value=1, {
         callagespecies <- sort.default(unique(selData()$Species.Code))
-        selectizeInput("selagespp", "Select Species Code:", choices = callagespecies,
-                       multiple = TRUE, options = list(placeholder = "click/type here"),
-                       selected = input$selectspecies)
+        updateSelectizeInput(session, "selagespp", choices = callagespecies,
+            selected = input$selectspecies, server = TRUE)
         })
       })
     
     #Age data - lake selection box built here (server.r) so only values matching selected sample are in drop down list
-      output$selagelake <- renderUI({
-        withProgress(message = "Loading Data",min=0,max=10,value=1, {
-          tempAgeSpp <- agedata
-              if(!is.null(input$selagespp)){
-                tempAgeSpp <- tempAgeSpp[tempAgeSpp$Species.Code %in% c(input$selagespp),]
-              }
-          callagelake <- sort.default(unique(tempAgeSpp$Lake.Code))
-          selectizeInput("selagelake", "Select Lake Code(s):", choices = callagelake,
-                         multiple = TRUE, options = list(placeholder = "click/type here"),
-                         selected = input$selectlake)
+      # output$selagelake <- renderUI({
+      #   withProgress(message = "Loading Data",min=0,max=10,value=1, {
+      #     tempAgeSpp <- agedata
+      #         if(!is.null(input$selagespp)){
+      #           tempAgeSpp <- tempAgeSpp[tempAgeSpp$Species.Code %in% c(input$selagespp),]
+      #         }
+      #     callagelake <- sort.default(unique(tempAgeSpp$Lake.Code))
+      #     selectizeInput("selagelake", "Select Lake Code(s):", choices = callagelake,
+      #                    multiple = TRUE, options = list(placeholder = "click/type here"),
+      #                    selected = input$selectlake)
+      #   })
+      # })
+        observe({
+          withProgress(message = "Loading Data",min=0,max=10,value=1, {
+            tempAgeSpp <- agedata
+            if(!is.null(input$selagespp)){
+              tempAgeSpp <- tempAgeSpp[tempAgeSpp$Species.Code %in% c(input$selagespp),]
+            }
+            callagelake <- sort.default(unique(tempAgeSpp$Lake.Code))
+            updateSelectizeInput(session, "selagelake", choices = as.character(callagelake),
+              selected = input$selectlake, server = TRUE)
+          })
         })
-      })
+        #above server-side processing causes mutate error with selageDatafinal() down below that appears to be
+        #due to processing on null object.  Seems there is some out-of-sequence processing here as it does
+        #produce the right selageDatafinal project, but throws this error while processing along the way. Goes
+        #away if I go back to ui.r rendering of this selectize box.
     
     #Age data - years selection box built here (server.r) so only values matching selected sample are in drop down list
-      output$selageyears <- renderUI({
-        withProgress(message = "Pairing Age Dataset",min=0,max=10,value=1, {
-          callageyears <- sort.default(selageData2()$Year)
-          selectizeInput("selageyears", "Select Year(s):", choices = callageyears,
-                         multiple = TRUE, options = list(placeholder = "click/type here"),
-                         selected = input$selectyear)
-        })  
-      })
-    
+      # output$selageyears <- renderUI({
+      #   withProgress(message = "Pairing Age Dataset",min=0,max=10,value=1, {
+      #     callageyears <- sort.default(selageData2()$Year)
+      #     selectizeInput("selageyears", "Select Year(s):", choices = callageyears,
+      #                    multiple = TRUE, options = list(placeholder = "click/type here"),
+      #                    selected = input$selectyear)
+      #   })
+      # })
+       observe({
+          withProgress(message = "Pairing Age Dataset",min=0,max=10,value=1, {
+            callageyears <- sort.default(selageData2()$Year)
+            updateSelectizeInput(session, "selageyears", choices = callageyears,
+              selected = input$selectyear, server = TRUE)
+            #below is more efficient, but I'm going back to old version to debug error
+            # updateSelectizeInput(session, "selageyears", choices = sort.default(selageData2()$Year),
+            #   selected = input$selectyear, server = TRUE)
+          })
+       })
+      #note above code causes error:
+          #Warning: Error in [.data.frame: undefined columns selected
+          #[No stack trace available]
+      #I suspect this is a data type issue (factor vs character or such) but probably is not related to Year
+      #The old ui.r rendering of the selectizeInput does not have this error, but I can't see any reason it
+      #would be different, so may be a timing issue of when something processes when I move to server-side
+      #processing.  
+      #When I pick species, I also get a mutate error about a null object with server side processing of both selageyears
+      #and selagelake that goes away if I go back to ui.r rendering of selectize boxes.  In the end, the app works
+      #despite these errors (further suggesting these are short term errors caused by processing something out of
+      #order such that it processes on an empty dataframe)
+         
     #Reminder to select species above in orange
       output$nospp <- renderText({
         if(is.null(input$selagespp)){
@@ -303,7 +333,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       })
       
 
-  ###Test if selected age dataset matches the selected sample dataset or if uploaded data being used################### 
+  ##Test if selected age dataset matches the selected sample dataset or if uploaded data being used################### 
       
     #display text showing matched age dataset in green
     output$yesmatch <- renderText({
@@ -339,7 +369,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     })
     
   
-  ###Create selected data table for reference age data#####
+  ##Create selected data table for reference age data#####
   
       #first filter by species selected by user
         selageData <- reactive({
@@ -400,7 +430,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
                                       Age = as.numeric(as.character(Age)))
             selageDatafinal
           }
-          #############################
+          #%%%%%%%%%%%%%%%%%%%%%%%%%%
         })
   
   
@@ -466,11 +496,11 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       })  
       output$ageyear <- renderText(input$selageyears)
     
-###############################################################
-#Catch Analysis Tab
-###############################################################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Catch Analysis Tab#####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   
-  ##Preliminary sample summary info on left####
+  ##Preliminary sample summary info on left
     #Data Selection Summary ###
       output$lakename2 <- renderText({lakename()})
       output$year2 <- renderText({yearname()})
@@ -545,7 +575,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         }
       })
       
-    #Total CPUE Table##################################################
+    ##Total CPUE Table##################################################
       cpuetable <- reactive({
         if(input$cpue == TRUE){
           #Aggregate into total catch by species per sample (also return gear code and effort) - transform SampleID to character
@@ -605,7 +635,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
           cpuetable()
         }
       })
-   #References and labels for PSD groupings##### 
+   ##PSD groupings and related output##### 
     #Render species name for PSD grouping reference
       output$speciesref <- renderText({speciesname()})
       
@@ -653,7 +683,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })
             
-    #CPUE by PSD Size Category Calculations#############################
+    ##CPUE by PSD Size Category Calculations#############################
     cpuesizetable <- reactive({
       if(input$cpuesize == TRUE){
         
@@ -667,43 +697,43 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         #Add Spp names using Gabelhouse.Name spelling, make sure everything is character data type (no factors),
           cpuesizetable <-left_join(selData,gabel, by = "Species.Code") %>% mutate_if(is.factor, as.character) %>% 
               
-        #add PSD size classes to each row based on fish lengths/spp
+          #add PSD size classes to each row based on fish lengths/spp
             mutate(psdval = psdAdd(TL_mm ~ Gabelhouse.Name, verbose = FALSE)) %>%  
-          
-        #sum up # fish by spp and psd size class
-          group_by(SampleID, Gear.Code, Effort, Gear.Length, Species.Code, psdval) %>%
-            summarise(numbCaught = sum(Number.of.individuals), .groups = "drop") %>%
-
-        #force 0 into numbCaught variable when spp or size class was not caught at a given sample station (best to convert into a tibble first, then back into dataframe)
-          as_tibble() %>%
-            complete(nesting(SampleID, Gear.Code, Effort, Gear.Length), Species.Code, psdval, fill = list(numbCaught=0)) %>%
-            as.data.frame()  %>%
-
-        #Create proper effort based on gear type as "Effort 2" so can multiply # caught by this to get CPUE
-          mutate(Effort2 = case_when(Gear.Code >= 41 ~ 60/Gear.Length,  #EF gears (Number.of.individuals*60)/Gear.Length where gear length is in min. = #/hr
+            
+          #sum up # fish by spp and psd size class
+            group_by(SampleID, Gear.Code, Effort, Gear.Length, Species.Code, psdval) %>%
+              summarise(numbCaught = sum(Number.of.individuals), .groups = "drop") %>%
+  
+          #force 0 into numbCaught variable when spp or size class was not caught at a given sample station (best to convert into a tibble first, then back into dataframe)
+            as_tibble() %>%
+              complete(nesting(SampleID, Gear.Code, Effort, Gear.Length), Species.Code, psdval, fill = list(numbCaught=0)) %>%
+              as.data.frame()  %>%
+  
+          #Create proper effort based on gear type as "Effort 2" so can multiply # caught by this to get CPUE
+            mutate(Effort2 = case_when(Gear.Code >= 41 ~ 60/Gear.Length,  #EF gears (Number.of.individuals*60)/Gear.Length where gear length is in min. = #/hr
                            Gear.Code <= 40 & Gear.Code != 10 ~ 24/Effort,  #net gears (Number.of.individuals*24)/Effort where effort is number of net nights= #/24h
                            Gear.Code == 10 ~ 1076/Effort)) %>%  #Seine (Number.of.individuals*1076)/Effort...not sure how this works, but should make #/ft^2
 
-        #Calculate CPUE by SampleID
-          group_by(SampleID, Effort2, Species.Code, psdval) %>% 
-              summarise(CPUEsite = numbCaught*Effort2, .groups = "drop") %>%
+          #Calculate CPUE by SampleID
+            group_by(SampleID, Effort2, Species.Code, psdval) %>% 
+            summarise(CPUEsite = numbCaught*Effort2, .groups = "drop") %>%
 
-        #Remove species code 98 (no species caught) or data with no PSD size class or TL
-          left_join(gabel, by = "Species.Code") %>% subset(!is.na(Gabelhouse.Name) & !is.na(psdval) &
-             !Species.Code %in% noTL$Species.Code) %>% select(-Gabelhouse.Name) %>%
+          #Remove species code 98 (no species caught) or data with no PSD size class or TL
+            left_join(gabel, by = "Species.Code") %>% subset(!is.na(Gabelhouse.Name) & !is.na(psdval) &
+               !Species.Code %in% noTL$Species.Code) %>% select(-Gabelhouse.Name) %>%
+  
+          #Add Species.Name and drop Species.Code
+            left_join(speciesinfo, by = "Species.Code") %>% select(-Species.Code) %>% relocate(Species.Name) %>%
+  
+          #average catch rates across sites (still within psdval groupings) and create RSE/95%CI/etc.
+            group_by(Species.Name, psdval) %>% summarise(Mean = mean(CPUEsite), SD = sd(CPUEsite), Count = n(), 
+               SE=if(SD==0){NA}else{ (SD/sqrt(Count))},  #make SE missing if SD was zero...prevents 95% CI that is 0-0 (and not correct)
+               "L 95% CI" = Mean - (1.96*SE), "U 95% CI" = Mean + (1.96*SE), RSE = (SE/Mean)*100, CV = (SD/Mean)*100,
+               "N RSE = 12.5 (25% range)" = as.integer(round(((CV/12.5)^2),0)), "N RSE = 20 (40% range)" =
+               as.integer(round(((CV/20)^2),0))) %>%
 
-        #Add Species.Name and drop Species.Code
-          left_join(speciesinfo, by = "Species.Code") %>% select(-Species.Code) %>% relocate(Species.Name) %>%
-
-        #average catch rates across sites (still within psdval groupings) and create RSE/95%CI/etc.
-          group_by(Species.Name, psdval) %>% summarise(Mean = mean(CPUEsite), SD = sd(CPUEsite), Count = n(), 
-             SE=if(SD==0){NA}else{ (SD/sqrt(Count))},  #make SE missing if SD was zero...prevents 95% CI that is 0-0 (and not correct)
-             "L 95% CI" = Mean - (1.96*SE), "U 95% CI" = Mean + (1.96*SE), RSE = (SE/Mean)*100, CV = (SD/Mean)*100,
-             "N RSE = 12.5 (25% range)" = as.integer(round(((CV/12.5)^2),0)), "N RSE = 20 (40% range)" =
-             as.integer(round(((CV/20)^2),0))) %>%
-
-        #organize/format for output table (drop unneeded columns and rename things)
-          select(-SD, -Count, -CV) %>% relocate(RSE, .after=Mean) %>% rename(Species = Species.Name, "Size Category" = psdval)
+          #organize/format for output table (drop unneeded columns and rename things)
+            select(-SD, -Count, -CV) %>% relocate(RSE, .after=Mean) %>% rename(Species = Species.Name, "Size Category" = psdval)
       }
     })
     
@@ -718,7 +748,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
   
    
     
-    #Catch Tab Download buttons##########################
+    ##Catch Tab Download buttons##########################
       # Downloadable csv of total cpue table
       output$downcpue <- downloadHandler(
         filename = function() {
@@ -737,11 +767,10 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
           write.csv(cpuesizetable(), file, row.names = FALSE)
         }
       )
-    
        
-###############################################################
-#Single Species Analysis Tab
-###############################################################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Single Species Analysis Tab#########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
   #sample summary line
     output$sampleline <- renderText({
@@ -798,7 +827,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       # }
     })
     
-  #Length Frequency Histogram####################################
+  ##Length Frequency Histogram####################################
     lfplot <- function(){
       if(input$lengthfrequency == TRUE){
         #set plot margins
@@ -873,7 +902,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     }
   )
 
-  #PSD Tables####################################################
+  ##PSD Tables####################################################
     #psd category length reference table
     output$psdvaltable <- renderTable(digits=1, rownames=FALSE, spacing="xs", {
       if(input$psd == TRUE){
@@ -915,7 +944,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     }
   })
     
-  #Relative Weight Table#########################################
+  ##Relative Weight Table#########################################
     
     #create standard weight equation for reference
     output$standardequation <- renderTable(rownames = FALSE, digits = 3,{
@@ -984,7 +1013,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     }) 
     
-  #Length-Weight Regression Plot###################################
+  ##Length-Weight Regression Plot###################################
     lwreg <- function(){
       if(input$lwregression == TRUE){
         #if weight is NA, remove entire record
@@ -1028,97 +1057,97 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })
     
-#Length-weight download buttons##################
-    #Download png of length frequency plot
-    output$downlfplot <- downloadHandler(
-      filename = function(){ 
-        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-              "LFplot", "png", sep = ".")},
-      content = function(file){
-        png(file, width = 600, height = 400)
-        lfplot()
-        dev.off()
+  ##Download buttons##################
+      #Download png of length frequency plot
+      output$downlfplot <- downloadHandler(
+        filename = function(){ 
+          paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+                "LFplot", "png", sep = ".")},
+        content = function(file){
+          png(file, width = 600, height = 400)
+          lfplot()
+          dev.off()
+        })
+      
+      #Downloadable csv of PSD table
+      output$downpsd <- downloadHandler(
+        filename = function() {
+          paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+                "psd", "csv", sep = ".")
+        },
+        content = function(file) {
+          write.csv(psdfinal(), file, row.names = TRUE)
+        }
+      )
+      
+      #Downloadable csv of relative weight table
+      output$downwr <- downloadHandler(
+        filename = function() {
+          paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+                "Wr", "csv", sep = ".")
+        },
+        content = function(file) {
+          write.csv(table(), file, row.names = FALSE)
+        }
+      )
+      
+      #Download png of length weight regression plot
+      output$downLWregplot <- downloadHandler(
+        filename = function(){ 
+          paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+                "LWregplot", "png", sep = ".")},
+        content = function(file){
+          png(file, width = 600, height = 450)
+          lwreg()
+          dev.off()
+        })
+      
+      
+      
+    ##Max length and weight stats#%%%%%%%%%%%%%%%%%%%%%%
+      output$maxspptab <- renderTable(digits = 2,{
+        if(input$max == TRUE){
+          #pull max length and weight from selected data
+          sppmax <- as.data.frame(max(selDataspp()$TL_mm, na.rm = NA))
+          sppmaxw <- as.data.frame(max(selDataspp()$Wt_g, na.rm = NA))
+          sppmax["maxw"] <- sppmaxw
+          sppmaxtable <- as.data.frame(sppmax)
+          colnames(sppmaxtable)[1] <- "maxl"
+          #calculate max length and weight in inches and pounds
+          sppmaxunits <- mutate(sppmaxtable, maxw = as.integer(maxw),
+                                maxlin = maxl*0.0393701, maxwpound = maxw*0.00220462)
+          colnames(sppmaxunits)[1:4] <- c("Max TL (mm)", "Max Wt (g)", "Max TL (in)", "Max Wt (lbs)")
+          sppmaxfinal <- sppmaxunits
+   
+        }
       })
+      
+      
+  ##Population Dynamics Column###############################################
     
-    #Downloadable csv of PSD table
-    output$downpsd <- downloadHandler(
-      filename = function() {
-        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-              "psd", "csv", sep = ".")
-      },
-      content = function(file) {
-        write.csv(psdfinal(), file, row.names = TRUE)
+    #Calculate observed age-length key ###
+      
+      alkobserved <- reactive({
+      #create variable for length groupings based on max TL in sample (10,15,or 20 mm)
+      if((max(selageDatafinal()$TLmm)/30)>=20){
+        w <- 20
       }
-    )
-    
-    #Downloadable csv of relative weight table
-    output$downwr <- downloadHandler(
-      filename = function() {
-        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-              "Wr", "csv", sep = ".")
-      },
-      content = function(file) {
-        write.csv(table(), file, row.names = FALSE)
+      if((max(selageDatafinal()$TLmm)/30)>=15 & (max(selageDatafinal()$TLmm)/30)<19.9999){
+        w <- 15
       }
-    )
-    
-    #Download png of length weight regression plot
-    output$downLWregplot <- downloadHandler(
-      filename = function(){ 
-        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-              "LWregplot", "png", sep = ".")},
-      content = function(file){
-        png(file, width = 600, height = 450)
-        lwreg()
-        dev.off()
-      })
-    
-    
-    
-  #Max length and weight stats########################################################
-    output$maxspptab <- renderTable(digits = 2,{
-      if(input$max == TRUE){
-        #pull max length and weight from selected data
-        sppmax <- as.data.frame(max(selDataspp()$TL_mm, na.rm = NA))
-        sppmaxw <- as.data.frame(max(selDataspp()$Wt_g, na.rm = NA))
-        sppmax["maxw"] <- sppmaxw
-        sppmaxtable <- as.data.frame(sppmax)
-        colnames(sppmaxtable)[1] <- "maxl"
-        #calculate max length and weight in inches and pounds
-        sppmaxunits <- mutate(sppmaxtable, maxw = as.integer(maxw),
-                              maxlin = maxl*0.0393701, maxwpound = maxw*0.00220462)
-        colnames(sppmaxunits)[1:4] <- c("Max TL (mm)", "Max Wt (g)", "Max TL (in)", "Max Wt (lbs)")
-        sppmaxfinal <- sppmaxunits
- 
+      if((max(selageDatafinal()$TLmm)/30)<14.9999){
+        w <- 10
       }
-    })
-    
-    
-#Population Dynamics Column###############################################
-  
-  #Calculate observed age-length key #################################################
-    
-    alkobserved <- reactive({
-    #create variable for length groupings based on max TL in sample (10,15,or 20 mm)
-    if((max(selageDatafinal()$TLmm)/30)>=20){
-      w <- 20
-    }
-    if((max(selageDatafinal()$TLmm)/30)>=15 & (max(selageDatafinal()$TLmm)/30)<19.9999){
-      w <- 15
-    }
-    if((max(selageDatafinal()$TLmm)/30)<14.9999){
-      w <- 10
-    }
-    #create length category variable
-    agelencat <- lencat(~TLmm, w=w, startcat = 0, right = FALSE, as.fact = TRUE, drop.levels = FALSE,
-                        use.names = FALSE, data = selageDatafinal())
-    #count frequency of ages within each length category - create proportion table
-    alkfreq <- xtabs(~LCat+Age, data = agelencat)
-    alk <- prop.table(alkfreq, margin = 1)
-    round(alk,3)
-    }) 
-    
-  #Calculate multinomial logistic regression age-length key#############################
+      #create length category variable
+      agelencat <- lencat(~TLmm, w=w, startcat = 0, right = FALSE, as.fact = TRUE, drop.levels = FALSE,
+                          use.names = FALSE, data = selageDatafinal())
+      #count frequency of ages within each length category - create proportion table
+      alkfreq <- xtabs(~LCat+Age, data = agelencat)
+      alk <- prop.table(alkfreq, margin = 1)
+      round(alk,3)
+      }) 
+      
+  ###Calculate multinomial logistic regression age-length key#############################
     
     alkmlr <- reactive({
     #create variable for length groupings based on max TL in sample (10,15,or 20 mm)
@@ -1145,7 +1174,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       alkmlr <- alkmlr1
     })
     
-    #Create dataset with predicted ages for the sample data (fields c(TL_mm, LCat, Age))##########
+    ###Create dataset with predicted ages for the sample data (fields c(TL_mm, LCat, Age))##########
     
     agesample <- reactive({
       #create variable for length groupings based on max TL in sample (10,15,or 20 mm)
@@ -1175,7 +1204,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       agesample <- subset(agesample, Number.of.individuals > 0)
     })
       
-  #Age Length Key Bubble Plot#############################################
+  ###Age Length Key Bubble Plot#############################################
     
     alkbub <- function(){
       if(input$agelengthkey == TRUE){
@@ -1194,7 +1223,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })
     
-  #Age-Frequency Histogram################################################
+  ###Age-Frequency Histogram################################################
     
     agefreq <- function(){
       if(input$agefreq == TRUE){
@@ -1218,7 +1247,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })
     
-    #von Bertalanffy Growth Model#################################################
+    ##von Bertalanffy Growth Model#################################################
     
     fitvonB <- reactive({
       
@@ -1239,7 +1268,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
                                            printEval = FALSE, warnOnly = TRUE))
     })
     
-  #Mean length-at-age plot and von Bert Plot################################################
+  ###Mean length-at-age plot and von Bert Plot################################################
     
     lengthplot <- function(){
       if(input$growth == TRUE){
@@ -1333,7 +1362,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     }) 
    
-     #Mean weight-at-age table##################################################
+     ###Mean weight-at-age table##################################################
     weighttable <- reactive({
       if(input$meanweight == TRUE){
         if(input$inch == FALSE){
@@ -1369,7 +1398,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })  
     
-  #von Bert Coefficient Table########################################################
+  ###von Bert Coefficient Table########################################################
     
     coeftable <- function(){
       if(input$vonbert == TRUE){
@@ -1393,7 +1422,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       }
     })
     
-  #Catch Curve plot and mortality table#######################################
+  ###Catch Curve plot and mortality table#######################################
     
     catchplot <- function(){
       if(input$mort == TRUE){
@@ -1463,258 +1492,480 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     }
   })  
 
-#Population Dynamics column downloads###################
+  ###Population Dynamics column downloads###################
+    
+    #Download png of ALK bubble plot
+    output$downALKplot <- downloadHandler(
+      filename = function(){ 
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "ALKplot", "png", sep = ".")},
+      content = function(file){
+        png(file, width = 600, height = 450)
+        alkbub()
+        dev.off()
+      })
+    
+    #Download png of Age Frequency plot
+    output$downafplot <- downloadHandler(
+      filename = function(){ 
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "AgeFreq", "png", sep = ".")},
+      content = function(file){
+        png(file, width = 600, height = 450)
+        agefreq()
+        dev.off()
+      })
+    
+    #Download png of Growth Metrics plot
+    output$downmeanplot <- downloadHandler(
+      filename = function(){ 
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "MeanLength", "png", sep = ".")},
+      content = function(file){
+        png(file, width = 600, height = 450)
+        lengthplot()
+        dev.off()
+      })
+    
+    #Downloadable csv of mean length at ages
+    output$downML <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "MeanLength", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(lengthtable(), file, row.names = FALSE)
+      }
+    )
+    
+    #Downloadable csv of mean weight at ages
+    output$downMW <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "MeanWeight", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(weighttable(), file, row.names = FALSE)
+      }
+    )
+    
+    #Downloadable csv of von Bert coefficients
+    output$downvonBcoef <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "vonBcoef", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(coeftable(), file, row.names = TRUE)
+      }
+    )
+    
+    #Download png of Catch Curve
+    output$downmort <- downloadHandler(
+      filename = function(){ 
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "CatchCurve", "png", sep = ".")},
+      content = function(file){
+        png(file, width = 600, height = 450)
+        catchplot()
+        dev.off()
+      })
+    
+    #Downloadable csv of mortality table
+    output$downmorttable <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
+              "mortTable", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(mortfinal(), file, row.names = TRUE)
+      }
+    )
+    
+    #Downloadable csv of observed age-length key
+    output$obsALK <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectspecies,
+              "obsALK", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(alkobserved(), file, row.names = TRUE)
+      }
+    )
+    
+    #Downloadable csv of smoothed age-length key
+    output$smoothALK <- downloadHandler(
+      filename = function() {
+        paste(input$selectlake,input$selectyear,input$selectspecies,
+              "smoothALK", "csv", sep = ".")
+      },
+      content = function(file) {
+        write.csv(alkmlr(), file, row.names = TRUE)
+      }
+    )
+    
   
-  #Download png of ALK bubble plot
-  output$downALKplot <- downloadHandler(
-    filename = function(){ 
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "ALKplot", "png", sep = ".")},
-    content = function(file){
-      png(file, width = 600, height = 450)
-      alkbub()
-      dev.off()
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#Percentile tab calculations##############
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  #create variables to indicate if the tab just loaded for first time...used for server-side processing of choices in selectize boxes
+  # FirstRun <- observeEvent(input$tabs,{
+  #   if(input$tabs == "Statewide Percentiles"){
+  #     #data.frame(GR=TRUE)
+  #     #IterationCnt()
+  #   }
+  # })
+  
+  #load initial data
+  percentileData <- reactive({
+    percentileData <- read.csv("PercentileData.csv")  #use this when we go live
+    #percentileData <- read.csv("PercData2005.csv")  #Dan using this for testing to save time...only data >2005
+      percentileData
+      })
+  
+  ###Calculate Selectize boxes(populate w/ gear/spp from Select Sample tab)
+  
+      #set up loading screen for waiter package
+        waiting_screen <- tagList(
+          #spin_flower(),#spin_loaders(id=32, color = "red", style = NULL),#spin_ball(),
+          spin_whirly(),
+          #need to move text down or spinner ends up on top of it, so add two br()
+          h4(br(),br(),"Please wait while the app loads the percentile data...this may take several second")
+        ) 
+       
+      #code creates a line break
+        output$lineBrk <- renderUI({HTML("<br/>")})
+        
+    #Create N_agedMin slider on server side to get max age info
+        maxN_aged <- reactive({max(percentileData()$N_aged, na.rm=TRUE)})
+        output$NAgedMinSlider <- renderUI({sliderInput(inputId = "N_agedMin", label = 
+               "Min # of aged fish used for growth/mortality metrics", min = 20, max = maxN_aged(), sep = "", step=1, value = 50)
+        })
+        
+      #Percentiles selectize box
+        output$percentileInptBox <- renderUI({
+          waiter_show(html = waiting_screen, color = "#33E8FF") #puts up loading screen from waiter package
+                on.exit(waiter_hide()) #removes loading screen once renderUI complete
+            selectizeInput("percentileInpt", "To customize percentiles produced, type desired values in this box",
+                "Percentiles:",choices = c(paste(1:99,rep("%",99),sep="")),multiple = TRUE, 
+                options = list(placeholder = "click/type here"))
+        })
+     
+          #Process input of percentileInptBox to establish which percentile values to calculate
+            PercToProp = data.frame(prop = (c(seq(0.01,0.99, by= 0.01)))) %>% 
+              mutate(perc = paste(prop  *100, "%", sep = ""))
+            selPerctls <- Vectorize(reactive({if(is.null(input$percentileInpt)){
+                selPerctls <- c(0.05,0.15,0.25,0.5,0.75,0.85,0.95)#sets default percentages
+              }else{   #unless user specified percentiles to use
+                selPerctls <- as.numeric(unlist((left_join(data.frame(input$percentileInpt),PercToProp,by=c("input.percentileInpt"="perc")) %>%
+                 select(-"input.percentileInpt"))))}})) #reads from percentile selectize box and converts to proportion.
+                
+    #Create N_SurveyMin slider on server side to get min # surveys to use and set it to # percentiles requested by default
+      N_perc_columns <- reactive({length(selPerctls())}) #this is not working
+      output$min_survey <- renderUI({sliderInput(inputId = "N_SurveyMin", label = 
+            "Min # of surveys for which to calculate percentiles", 
+            #min = 3, max = 100, sep = "", step=1, value = 10)
+            min = 3, max = 100, sep = "", step=1, value = N_perc_columns())
+      })
+        
+  
+  ##cross-populate selectize boxes with Code and Names selections####
+    
+    #Functions to grab codes from names and vice versa and syncing selection boxes for codes/names
+    
+      #Functions for converting codes to names
+        gearnameperc <- function(){  
+          gear <- as.data.frame(as.character(input$selPercGear))
+          colnames(gear) <- "Gear.Code"
+          gear <- plyr::join(gear,gearinfo,by="Gear.Code")
+          gearname <- as.character(gear[,2])
+        }
+        sppnameperc <- function(){
+          species <- as.data.frame(as.character(input$selPercSpp))
+          colnames(species) <- "Species.Code"
+          species <- plyr::join(species,speciesinfo,by="Species.Code")
+          speciesname <- as.character(species[,2])
+        }
+        lakenameperc <- function(){
+          lake <- as.data.frame(as.character(input$selLakeCodePerc))
+          colnames(lake) <- "Lake.Code"
+          lake <- plyr::join(lake,lakeinfo,by="Lake.Code")
+          speciesname <- as.character(lake[,2])
+        }
+        
+      #Functions for converting Names to codes
+        gearcodeperc <- function(){  
+          gear <- as.data.frame(as.character(input$selPercGearNm))
+          colnames(gear) <- "Gear.Name"
+          gear <- plyr::join(gear,gearinfo,by="Gear.Name")
+          gearcode <- as.character(gear[,2])
+        }
+        speciescodeperc <- function(){  
+          species <- as.data.frame(as.character(input$selPercSppNm))
+          colnames(species) <- "Species.Name"
+          species <- plyr::join(species,speciesinfo,by="Species.Name")
+          speciescode <- as.character(species[,2])
+        }
+        lakecodeperc <- function(){
+          lake <- as.data.frame(as.character(input$selLakeNamePerc))
+          colnames(lake) <- "Lake.Name"
+          lake <- plyr::join(lake,lakeinfo,by="Lake.Name")
+          lakecode <- as.character(lake[,2])
+        }
+        
+    #update selectize boxes from Code to Name and server-side processing choices (is faster than ui.r)
+    observe({withProgress(message = "Loading Cross-pop Code to Name Data",min=0,max=10,value=1, {
+      if(is.null(input$selPercGear)){
+          updateSelectizeInput(session, "selPercGearNm", selected = NULL, choices = sort.default(gearinfo$Gear.Name),
+          server = TRUE)
+        }else{
+          updateSelectizeInput(session, "selPercGearNm", selected = gearnameperc())
+        }
+      if(is.null(input$selPercSpp)){
+          updateSelectizeInput(session, "selPercSppNm", selected = NULL, choices = sort.default(speciesinfo$Species.Name), 
+          server = TRUE)
+        }else{
+          updateSelectizeInput(session, "selPercSppNm", selected = sppnameperc())
+        }  
+      if(is.null(input$selLakeCodePerc)){
+          updateSelectizeInput(session, "selLakeNamePerc", selected = NULL, choices = sort.default(lakeinfo$Lake.Name),
+          server = TRUE)
+      }else{
+        updateSelectizeInput(session, "selLakeNamePerc", selected = lakenameperc())
+      }
+    })})
+    
+    #update selectize boxes from Name to Code (and server-side processing of code box choices)
+       
+      #create Gear Code observer function to set choices and default selected item on first run
+      observe({withProgress(message = "Loading Cross-pop Name to Code Data",min=0,max=10,value=1, {
+         updateSelectizeInput(session, "selPercGear", choices = sort.default(gearinfo$Gear.Code),
+            selected = input$selectgear, server = TRUE)
+        # updateSelectizeInput(session, "selPercGear", choices = sort.default(percentileData()$Gear.Code),
+        #      selected = input$selectgear, server = TRUE) #option using available gear codes in percentileData
+      })})
+      
+      #create Species Code observer function to set choices and default selected item on first run
+      observe({withProgress(message = "Loading Cross-pop Name to Code Data",min=0,max=10,value=1, {
+         updateSelectizeInput(session, "selPercSpp", choices = sort.default(speciesinfo$Species.Code),
+            selected = input$selectspecies, server = TRUE)
+        # updateSelectizeInput(session, "selPercSpp", choices = sort.default(percentileData()$Species.Code),
+        #     selected=input$selectspecies, server = TRUE)
+      })})
+      
+      #create Lake Code observer function to set choices on first run
+      observe({withProgress(message = "Loading Cross-pop Name to Code Data",min=0,max=10,value=1, {
+        updateSelectizeInput(session, "selLakeCodePerc", choices = sort.default(lakeinfo$Lake.Code),
+            selected = ,server = TRUE) 
+      })})
+      
+    #create observer function to set value to name boxes if value in code boxes change
+      observe({
+        updateSelectizeInput(session, "selPercGear", selected = gearcodeperc())
+        updateSelectizeInput(session, "selPercSpp", selected = speciescodeperc())
+        updateSelectizeInput(session, "selLakeCodePerc", selected = lakecodeperc())
+      })
+        
+    
+    ##Filter percentileData for selected parameters####
+    #Filter main table based on lake, years, gears, region, and/or lake
+    selPercData <- reactive({
+      selPercData <- left_join(percentileData(),(lakeinfo %>% select(Lake.Code,ODWC.Region)),by = "Lake.Code")
+      if(!is.null(input$selPercGear)){selPercData <- selPercData[selPercData$Gear.Code %in% c(input$selPercGear),]}
+      if(!is.null(input$selPercSpp)){selPercData <- selPercData[selPercData$Species.Code %in% c(input$selPercSpp),]}
+      if(!is.null(input$perYrs)){selPercData <- selPercData[selPercData$Year %in% c(input$perYrs[1]:input$perYrs[2]),]}
+      if(!is.null(input$selRegionPerc)){selPercData <- selPercData[selPercData$ODWC.Region %in% c(input$selRegionPerc),]}
+      if(!is.null(input$selLakeCodePerc)){selPercData <- selPercData[selPercData$Lake.Code %in% c(input$selLakeCodePerc),]}
+      selPercData
     })
-  
-  #Download png of Age Frequency plot
-  output$downafplot <- downloadHandler(
-    filename = function(){ 
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "AgeFreq", "png", sep = ".")},
-    content = function(file){
-      png(file, width = 600, height = 450)
-      agefreq()
-      dev.off()
+      
+    #Create age-related data based on N_agedMin slider input
+    selPercData_age <- reactive({
+      selPercData_age <- subset(percentileData(), N_aged >= input$N_agedMin)
     })
-  
-  #Download png of Growth Metrics plot
-  output$downmeanplot <- downloadHandler(
-    filename = function(){ 
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "MeanLength", "png", sep = ".")},
-    content = function(file){
-      png(file, width = 600, height = 450)
-      lengthplot()
-      dev.off()
-    })
-  
-  #Downloadable csv of mean length at ages
-  output$downML <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "MeanLength", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(lengthtable(), file, row.names = FALSE)
-    }
-  )
-  
-  #Downloadable csv of mean weight at ages
-  output$downMW <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "MeanWeight", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(weighttable(), file, row.names = FALSE)
-    }
-  )
-  
-  #Downloadable csv of von Bert coefficients
-  output$downvonBcoef <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "vonBcoef", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(coeftable(), file, row.names = TRUE)
-    }
-  )
-  
-  #Download png of Catch Curve
-  output$downmort <- downloadHandler(
-    filename = function(){ 
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "CatchCurve", "png", sep = ".")},
-    content = function(file){
-      png(file, width = 600, height = 450)
-      catchplot()
-      dev.off()
-    })
-  
-  #Downloadable csv of mortality table
-  output$downmorttable <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-            "mortTable", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(mortfinal(), file, row.names = TRUE)
-    }
-  )
-  
-  #Downloadable csv of observed age-length key
-  output$obsALK <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectspecies,
-            "obsALK", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(alkobserved(), file, row.names = TRUE)
-    }
-  )
-  
-  #Downloadable csv of smoothed age-length key
-  output$smoothALK <- downloadHandler(
-    filename = function() {
-      paste(input$selectlake,input$selectyear,input$selectspecies,
-            "smoothALK", "csv", sep = ".")
-    },
-    content = function(file) {
-      write.csv(alkmlr(), file, row.names = TRUE)
-    }
-  )
-  
+    #Create sort files for all tables that include PSD values
+    #SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","memorable","trophy"),sortOrder=c(1,2,3,4,5,6,7))
+      ###moved above line to top of program as we will use for regular SSP table sorting when adding Trophy category back into code
 
-################################
-#Percentile tab calculations
-################################
-#   #load percentile data if tab is clicked on (saves time on main app loading)
-#     observeEvent(input$tabs, {
-#         if(input$tabs == "Statewide Percentiles"){
-#           if(!exists("percentileData")){
-#               percentileData <- read.csv("PercentileData.csv")}
-#           #req(percentileData)
-#           hide(id = "loading-content-percTab", anim = TRUE, animType = "fade")#hides loading message...may want to move until after table gets rendered as there is still long delay after file was read before new things appear
-#         }
-#       })
-# 
-#   ########################################
-#     #If you do not have percentileData manually loaded (i.e., outside shiny), this shiny app will not run.  Somewhere, there
-#     #is a dependency on percentileData that is not dealt with using an !exist or req() statement for the file.  I should 
-#     #systematically try to comment out parts of ui.r and server.r to try to isolate where this comes from and fix it.  
-#     #Note req() seems to cause problems in ui.r.  Web site where I saw the use of this function is https://shiny.rstudio.com/articles/req.html
-#   ########################################
-#   
-#   
-#   
-#   #below is not working...never removes message even after table is displayed
-#     # reactive({if(exists("percentileTable")){
-#     #   hide(id = "loading-content-percTab", anim = TRUE, animType = "fade")}#hides loading message...may want to move until after table gets rendered as there is still long delay after file was read before new things appear
-#     # })
-# 
-#   #Selectize boxes for Gear code, Species code, and lake name populated with gear/spp from Select Sample tab
-#         #Gear Code
-#         output$selGearPerc <- renderUI({
-#           #req(percentileData)
-#           withProgress(message = "Loading Data",min=0,max=10,value=1, {
-#             selectizeInput("selPercGear", "Gear Code(s):", choices = sort.default(percentileData$Gear.Code),
-#                 multiple = TRUE, options = list(placeholder = "click/type here"),selected=input$selectgear)}) })
-# 
-#         #code creates a line break
-#           output$lineBrk <- renderUI({HTML("<br/>")})
-# 
-#         #Species Code selectize box
-#         output$selSppPerc <- renderUI({
-#           #req(percentileData)
-#           withProgress(message = "Loading Data",min=0,max=10,value=1, {
-#             selectizeInput("selPercSpp", "Species Code(s):", choices = sort.default(percentileData$Species.Code),
-#                 multiple = TRUE, options = list(placeholder = "click/type here"),selected=input$selectspecies)}) })
-# 
-#         #Lake name and lake code syntax needs to be built here...treat like gear code/name above
-# 
-#         #Percentiles selectize box
-#         output$percentileInptBox <- renderUI({
-#           withProgress(message = "Loading Data",min=0,max=10,value=1, {
-#             selectizeInput("percentileInpt", "To customize percentiles produced, type desired values in this box","Percentiles:",
-#                 choices = c(paste(1:99,rep("%",99),sep="")),multiple = TRUE, options = list(placeholder = "click/type here"))}) })
-#           #Process above input to establish which percentile values to calculate
-#             PercToProp=data.frame(prop=(c(seq(0.01,0.99,by=0.01)))) %>% mutate(perc=paste(prop*100,"%",sep=""))
-#             Percentiles <- Vectorize(reactive({if(is.null(input$percentileInpt)){
-#                 Percentiles <- c(0.05,0.15,0.25,0.5,0.75,0.85,0.95)}else{   #sets default percentages
-#                 Percentiles <- as.numeric(unlist((left_join(data.frame(input$percentileInpt),PercToProp,by=c("input.percentileInpt"="perc")) %>%
-#                  select(-"input.percentileInpt"))))}})) #reads from percentile selectize box and converts to proportion.
-# 
-#   #Filter percentileData for selected parameters
-#     selPercData <- reactive({
-#       #req(percentileData)#next line with if statement should have covered this...may not need both but I'm adding for now to debug
-#       if(exists("percentileData")){
-#           selPercData <- percentileData
-#           if(!is.null(input$selPercGear)){selPercData <- selPercData[selPercData$Gear.Code %in% c(input$selPercGear),]}
-#           if(!is.null(input$selPercSpp)){selPercData <- selPercData[selPercData$Species.Code %in% c(input$selPercSpp),]}
-#           if(!is.null(input$perYrs)){selPercData <- selPercData[selPercData$Year %in% c(input$perYrs[1]:input$perYrs[2]),]}
-#           #below is to filter by ODWC.Region, but it is causing selPercData=null even if no region is selected
-#           # if(!is.null(input$selRegionPerc)){
-#           #   selPercData <- left_join(selPercData,(lakeinfo %>% select(Lake.Code,ODWC.Region)),by="Lake.Code")
-#           #   selPercData <- selPercData[selPercData$ODWC.Region %in% c(input$selRegionPerc),]}
-#           #need to add filters for Lake.Code
-#       }
-#       })
-# 
-# 
-#   #cross-list gear name or gear code
-#     observe({withProgress(message = "Loading Data",min=0,max=10,value=1, {
-#       updateSelectizeInput(session, "selPercGear", selected = gearcodeperc())
-#       updateSelectizeInput(session, "selPercSpp", selected = speciescodeperc())
-#     })})#for percentile select box to cross-populate if changed
-#     observe({withProgress(message = "Loading Data",min=0,max=10,value=1, {
-#       updateSelectizeInput(session, "selPercGearNm", selected = gearnameperc())
-#       updateSelectizeInput(session, "selPercSppNm", selected = sppnameperc())
-#     })})#for percentile select box to cross-populate if changed
-# 
-# 
-# 
-#   #create output tables with percentiles##############################
-# 
-#     #Create sort files for all tables that include PSD values
-#     #SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","memorable","trophy"),sortOrder=c(1,2,3,4,5,6,7))
-#       ###moved above line to top of program as we will use for regular SSP table sorting when adding Trophy category back into code
-#         SortCPUE <- SortPSD %>% mutate(metric_cat=paste("CPUE",SortPSD$PSDname,sep=""),cat_title=paste("CPUE-",SortPSD$PSDname,
-#              sep="")) %>% mutate(cat_title=replace(cat_title,cat_title=="CPUE-","Overall CPUE")) %>% select(-PSDname)
-# 
-#     #CPUE
-#     CPUEpercTable <- reactive({
-#       if(!is.null(input$selPercGear)){
-#         withProgress(message = "Loading Data", min=0,max=10,value=1, {
-#           CPUEperc <- selPercData() %>% group_by(Species.Code) %>% select(SurveyID:Nsites,CPUE:CPUEtrophy) %>% pivot_longer(cols=
-#               CPUE:CPUEtrophy,names_to = "metric_cat",values_to="metricVal")
-#           Nsurveys <- CPUEperc %>% subset(!is.na(metricVal)) %>% group_by(Species.Code,metric_cat) %>% summarise("# Surveys"=n(),.groups = "drop_last")
-#           CPUEpercMetrics <- CPUEperc%>% group_by(Species.Code,metric_cat) %>% group_modify(~{quantile(.x$metricVal, probs=Percentiles(),
-#               na.rm=TRUE) %>%tibble::enframe()}) %>% pivot_wider(names_from = name,values_from=value) %>% left_join(Nsurveys,by=c(
-#               "Species.Code","metric_cat")) %>% left_join(SortCPUE,by="metric_cat") %>% arrange(Species.Code,sortOrder) %>% left_join(
-#               speciesinfo,by="Species.Code") %>% relocate(Species.Name,cat_title) %>% ungroup() %>% select(-sortOrder,-metric_cat,
-#               -Species.Code) %>% rename("Species Name"="Species.Name","CPUE category"="cat_title")
-#             #note above group_modify() iterates a function on groups of data, but returns an atomic vector that needs to be parsed into
-#             #columns by enframe() to make a data fame
-#         CPUEpercTable <- CPUEpercMetrics
-#         })
-#       }
-#     })
-# 
-#     # Note we can change the location of the withProgress box using code at
-#     # https://stackoverflow.com/questions/35037230/change-style-and-position-of-the-message-box-generated-by-withprogress
-# 
-#     #now put in output table
-#       output$CPUEperc <- renderTable(digits = 2, spacing = "xs", {
-#         if(!is.null(input$selPercGear)){
-#           CPUEpercTable()
-#         }
-#       })
-# 
-# ##Stuff Dan used for testing/developing this tab#
-#       #selPercData2 <- reactive({selPercData2 <- selPercData() })#has 84 columns w/o ODWC.Region  %>% select(!Nfish:A)
-#   #Stuff for debugging using table outputs  #output$percentileTable <- renderTable(CPUEpercTable())
-#   #output$perYrsTabl <- renderTable(input$perYrs)
-#   #output$selPercDataTbl <- DT::renderDataTable(selPercData())
-#   #output$test <- renderTable(data.frame(input$percentileInpt))
-#   # output$test <- renderTable(data.frame(Percentiles()))
-#   # output$test2 <- renderTable(data.frame(PercToProp))
-#   #  output$test <- renderTable(data.frame(selPercData2()))
-# 
-#   
-##########################################    
-#stocking information Tab
-##########################################
+    
+ ###Calculate percentiles for various metrics##############################
+ 
+  #Max TL and Wt table calculations
+    maxTL_WT_percTable <- reactive({
+      maxTL_Wt <- selPercData() %>% group_by(Species.Code) %>% 
+          select(SurveyID:Species.Code, maxTL:N_maxWt) %>% 
+          pivot_longer(cols = c(maxTL, maxWt), names_to = "Metric", values_to="Values")
+  
+      Nsurveys <- maxTL_Wt %>% subset(!is.na(Values)) %>% group_by(Species.Code,Metric) %>%
+        summarise("# Surveys"=n(),.groups = "drop_last")
+          
+      maxTL_WT_percMetrics <- maxTL_Wt%>% group_by(Species.Code, Metric) %>%
+        group_modify(~{quantile(.x$Values, probs = selPerctls(), na.rm = TRUE) %>% tibble::enframe()}) %>%
+        mutate(value2 = case_when(Metric == "maxTL" ~ as.character(round(value, 0)),
+                                Metric == "maxWt" ~ as.character(format(round(value, 1), nsmall = 1)))) %>%
+        select(-value) %>%
+        pivot_wider(names_from = name, values_from = value2) %>%
+        left_join(Nsurveys, by = c("Species.Code", "Metric")) %>%
+        left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
+        mutate(Metric=recode(Metric, "maxTL" = "Maximum TL (mm)", "maxWt" = "Maximum Weight (g)")) %>% #rename metric values
+        rename("Species Name" = "Species.Name") %>%
+        arrange(Metric, "Species Name") %>%
+        ungroup() %>% as.data.frame() %>% select(-Species.Code) 
+      
+      maxTL_WT_percMetrics <- maxTL_WT_percMetrics[complete.cases(maxTL_WT_percMetrics[,"# Surveys"]) &
+        maxTL_WT_percMetrics$"# Surveys" >= input$N_SurveyMin,] #remove rows with # Surveys = NA or those with < min # surveys allowed
+        #note subset() does not work well for above statements...not sure why
+      
+      maxTL_WT_percMetrics
+    })
+ 
+    
+  #CPUE percentile table calculation
+    SortCPUE <- SortPSD %>% mutate(metric_cat = paste("CPUE", SortPSD$PSDname, sep=""), 
+        cat_title = paste("CPUE-", SortPSD$PSDname, sep = "")) %>% 
+        mutate(cat_title = replace(cat_title, cat_title == "CPUE-", "Overall CPUE")) %>% select(-PSDname)
+
+    CPUEpercTable <- reactive({
+      if(!is.null(input$selPercGear)){
+        withProgress(message = "Loading CPUE table Data", min = 0, max = 10, value = 1, {
+          CPUEperc <- selPercData() %>% select(SurveyID:Nsites, CPUE:CPUEtrophy) %>% group_by(Species.Code) %>% 
+            pivot_longer(cols = CPUE:CPUEtrophy, names_to = "metric_cat", values_to="metricVal")
+          
+          Nsurveys <- CPUEperc %>% subset(!is.na(metricVal)) %>% group_by(Species.Code, metric_cat) %>% 
+            summarise("# Surveys" = n(), .groups = "drop_last")
+          
+          CPUEpercMetrics <- CPUEperc %>% 
+            group_by(Species.Code, metric_cat) %>% 
+            group_modify(~{quantile(.x$metricVal, probs=selPerctls(), na.rm = TRUE) %>% 
+                tibble::enframe()}) %>% 
+                  pivot_wider(names_from = name, values_from = value) %>% 
+                  left_join(Nsurveys, by = c("Species.Code", "metric_cat")) %>% 
+                  left_join(SortCPUE, by = "metric_cat") %>% arrange(Species.Code, sortOrder) %>% 
+                  left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name, cat_title) %>% 
+                  ungroup() %>% 
+                  select(-sortOrder, -metric_cat, -Species.Code) %>% 
+                  rename("Species Name" = "Species.Name", "CPUE category" = "cat_title")
+            #note above group_modify() iterates a function on groups of data, but returns an atomic vector that needs to be parsed into
+            #columns by enframe() to make a data fame
+          CPUEpercTable <- CPUEpercMetrics[complete.cases(CPUEpercMetrics[,"# Surveys"]) & #remove NA's
+                                             CPUEpercMetrics$"# Surveys" >= input$N_SurveyMin,] #remove rows based on too few surveys
+        })
+      }
+    })
+
+    #PSD percentile calculations
+    PSDpercTable <- reactive({
+      PSDperc <- selPercData() %>% group_by(Species.Code) %>% 
+        select(SurveyID:Nsites, NfishStock:PSD.T) %>% 
+        pivot_longer(cols = PSD_S.Q:PSD.T, names_to = "PSDmetric", values_to="PSDVal") %>% 
+        drop_na(PSDVal) %>% filter(NfishStock >= input$N_PSDMin)
+      
+      Nsurveys <- PSDperc %>% group_by(Species.Code,PSDmetric) %>% 
+        summarise("N_Surveys"=n(),.groups = "drop_last")
+      
+      PSDsortOrder <- data.frame(PSDmetric=c("PSD_S.Q", "PSD_Q.P", "PSD_P.M", "PSD_M.T",
+                                   "PSD", "PSD.P", "PSD.M", "PSD.T"), sortOrder=1:8)
+      PSDpercMetrics <- PSDperc %>% 
+        left_join(Nsurveys, by=c("Species.Code","PSDmetric")) %>% 
+        filter(N_Surveys >= input$N_SurveyMin) %>% 
+        group_by(Species.Code, PSDmetric, N_Surveys) %>% 
+        group_modify(~{quantile(.x$PSDVal, probs=selPerctls(), na.rm=TRUE) %>%tibble::enframe()}) %>% 
+        pivot_wider(names_from = name,values_from=value) %>% 
+        left_join(PSDsortOrder, by="PSDmetric") %>% arrange(Species.Code, sortOrder) %>% 
+        left_join(speciesinfo, by="Species.Code") %>% relocate(Species.Name) %>% 
+        relocate(N_Surveys, .after = last_col()) %>% ungroup() %>% 
+        mutate("PSD Metric" = recode(PSDmetric, PSD_S.Q = "PSD S-Q", PSD_Q.P = "PSD Q-P", PSD_P.M = 
+           "PSD P-M", PSD_M.T = "PSD M-T", PSD.P = "PSD-P", PSD.M = "PSD-M", PSD.T = "PSD-T")) %>% 
+        relocate("PSD Metric", .after = Species.Name) %>% 
+        select(-sortOrder, -PSDmetric, -Species.Code) 
+    })
+
+  ###Make percentile output tables##############################
+
+    #Max TL and Wt output table
+      output$Max_TL_Wt_perc <- renderTable(spacing = "xs", {
+        if(!is.null(input$selPercGear) | !is.null(input$selPercSpp)){
+          if(nrow(selPercData() )>3){
+            maxTL_WT_percTable()
+          }
+        }
+      })
+      output$Max_TL_Wt_Text <- renderText({
+        if(!is.null(input$selPercGear) | !is.null(input$selPercSpp)){
+            CPUEtext <- as.character("Maximum TL (mm) and Weight (g) Percentiles")
+        }
+       })
+      
+    #Put CPUE percentile data in CPUEpercTable into output table
+      output$CPUEperc <- renderTable(digits = 2, spacing = "xs", {
+        if(!is.null(input$selPercGear)){
+          if(nrow(selPercData() )>3){
+            CPUEpercTable()
+          }
+        }
+      })
+      output$CPUEpercText <- renderText({
+        if(!is.null(input$selPercGear)){
+          if(nrow(selPercData() )>3){
+            CPUEtext <- as.character("CPUE Percentiles")
+          }else{
+            CPUEtext <- as.character("CPUE Percentiles - insufficent data exists to calculate percentiles, please select different parameters")
+          }
+        }
+      })
+      
+    #Put PSD percentile data in PSDpercTable into output table
+      output$PSDperc <- renderTable(digits = 0, spacing = "xs", {
+        if(!is.null(input$selPercGear)){
+          if(nrow(selPercData() )>3){
+            PSDpercTable()
+          }
+        } 
+      })
+      output$PSDpercText <- renderText({
+        if(!is.null(input$selPercGear)){
+          if(nrow(selPercData() )>3){
+            PSDtext <- as.character("PSD Percentiles")
+          }else{
+            PSDtext <- as.character("PSD Percentiles - insufficent data exists to calculate percentiles, please select different parameters")
+          }
+        }
+      })
+      
+    #need to decide how to handle single-species analysis...group by species or only provide output if 1 spp selected
+    
+      #maybe need to make reverse slider to select min # surveys for all metrics...default = 5 but go down to 3?
+      #Also might want a min # fish/sample for all but CPUE metric?...but maybe not...adds noise but adds N too and probably unbiased
+      #Maybe is bigger issue for max TL and WT?
+    #Wr by PSD
+    #Max TL...need to change percentileData to do this?
+    #Max Wt
+    #mean length at ages
+    #
+  
+# Note we can change the location of the withProgress box using code at
+# https://stackoverflow.com/questions/35037230/change-style-and-position-of-the-message-box-generated-by-withprogress
+
+#################
+      
+##Stuff Dan used for testing/developing this tab#  
+      output$firstRun <- renderText(input$N_agedMin)#{paste("GearRun=",GearRun)})
+      #output$firstRun <- renderText({paste("first run=",FirstRun$GR)})
+      #selPercData2 <- reactive({selPercData2 <- selPercData() })#has 84 columns w/o ODWC.Region  %>% select(!Nfish:A)
+  #Stuff for debugging using table outputs  #output$percentileTable <- renderTable(CPUEpercTable())
+  #output$perYrsTabl <- renderTable(input$perYrs)
+  output$selPercDataTbl <- DT::renderDataTable(selPercData())
+  output$selPercAgedTbl <- DT::renderDataTable(selPercData_age() %>% 
+           relocate(N_aged))
+  #output$test <- renderTable(data.frame(input$percentileInpt))
+  # output$test <- renderTable(data.frame(selPerctls()))
+  # output$test2 <- renderTable(data.frame(PercToProp))
+  #  output$test <- renderTable(data.frame(selPercData2()))
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+#stocking information Tab########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   stockinfo <- reactive({
      
     withProgress(message = "Loading Data", min=0,max=10,value=1, {

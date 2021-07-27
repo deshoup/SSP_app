@@ -61,6 +61,7 @@ COONCK,Coon Creek,,Southeast,,
 COPAN,Copan,,Northeast,,
 CRATER,Crater,,Southwest,,
 CROOKB,Crooked Branch,,?,,
+CROSSL,Crosslin,,Northwest,9,Yes
 CROWDE,Crowder,,Northwest,,
 CRYSTL,Crystal,,Central,,Yes
 CSCLOW,,,,,
@@ -73,6 +74,7 @@ DEADIN,Dead Indian,,Northwest,,
 DEEPFK,Eufala Deep Fork Arm,Eufala,East Central,,
 DOLESE,Dolese Youth Park,,Central,,Yes
 DOW,Dow,,Southeast,,
+DRAC,Dale Robertson Activity,,OKC,1,Yes
 DRAPER,Stanley Draper,,Central,,
 DROWNC,Grand Drowning Creek Arm,Grand,Northeast,,
 DRSPGS,Dripping Springs,,Central,,
@@ -110,16 +112,19 @@ FTSUPP,Fort Supply,,Northwest,,
 FUQUA,Fuqua,,Southwest,,
 GAINES,Eufala Gains Creek Arm,Eufala,East Central,,
 GARRIS,,,,,
+GOVTSP,Government Springs,,Northwest,2,Yes
 GRAHAM,Newt Graham L&D 18,,Northeast,,
 GRAMMA,Gramma,,Southwest,,
 GRAND,Grand Lake,,Northeast,,
 GRAPEV,Grapevine Lake,,,,
 GREENL,Greenleaf,,East Central,,
+GRIFFN,Griffin,,OKC,5,Yes
 GRSALT,Great Salt Plain,,Northwest,,
 GUTHRI,Guthrie,,Central,,
 GUYMON,,,,,
 HACKBE,Hackberry WMA Pond,,Southwest,,
 HALL,Hall,,Southwest,,
+HARRA,Heritage,,Central,,Yes
 HARTSH,Harthorne,,?,,
 HASKEL,Haskell,,East Central,,
 HEALDT,Healdton,,South Central,,
@@ -143,10 +148,13 @@ HUMPHR,Humphreys,,Southwest,,
 JACKBA,Fort Gibson Jackson Bay Arm,Fort Gibson,Northeast,,
 JAPBEA,Jap Beaver,,Southwest,,
 JEDJOH,Jed Johnson,,Southwest,,
+JENKS,Veterans Pond,,Northeast,3,Yes
 JEWEL,,,,,
 JIMHAL,Jim Hall Lake,,Central,,
 JNEUST,Jean Neustadt,,South Central,,
+JONES,Battey-Mulhousen,,OKC,5,Yes
 KAW,Kaw,,North Central,,
+KELLYL,Kelly Lane Pond,,Northeast,3,Yes
 KERR,Robert S. Kerr,,East Central,,
 KEYSTO,Keystone,,North Central,,
 KIDSWE,Kids Lake West,,Central,,Yes
@@ -156,6 +164,7 @@ LANGST,Langston,,Central,,
 LANSBR,Lansbrook,,Central,,
 LAWTON,Lawtonka,,Southwest,,
 LEEPER,Leeper,,South Central,,
+LEGION,Legion,,OKC,2,Yes
 LEGNPP,Legion Park,,Central,,Yes
 LIBERT,Liberty,,Central,,
 LINDSA,Lindsay City Lake,,Central,,
@@ -172,15 +181,20 @@ MCAFIN,,,,,
 MCALES,Mcalester,,Southeast,,
 MCGEE,McGee,,South Central,,
 MCMURT,McMurtry,,North Central,,
+MEADOW,Meadow,,Northwest,10,Yes
+MEDCRK,Medicine Creek,,Southwest,3,Yes
 MEEKER,Meeker,,Central,,
 MERAMI,,,,,
 MEREM,,,,,
 MINERL,Mineral Wells Park,,Central,,Yes
+MITCH,Mitch,,Central,,Yes
+MJLEE,MJ Lee Lake,,Northeast,20,Yes
 MSTPEN,McAlester Lake,,Southeast,,
 MTLAKE,Mountain Lake,,South Central,,
 MULDRO,Muldrow City,,East Central,,
 MULVEY,Mulvey,,Central,,
 MURRAY,Murray,,Southwest,,
+NEWCAS,Veterans,,OKC,4,Yes
 NEWSPI,New Spiro,,Southeast,,
 NICHOL,Henryetta Nichols Park,,Central,,
 NORCAN,Eufala North Canadian Arm,Eufala,East Central,,
@@ -223,9 +237,12 @@ SHAWN1,Shawnee Twin #1,,Central,,
 SHAWN2,Shawnee Twin #2,,Central,,
 SHELLC,Shell Creek,,North Central,,
 SHIDLE,Shidler,,North Central,,
+SHILLN,Soutlern Hills North,,OKC,1.5,Yes
+SHILLS,Southern Hills South,,OKC,1,Yes
 SJONES,Sally Jones,,East Central,,
 SKIATO,Skiatook,,North Central,,
 SKIPOU,Skipout,,Northwest,,
+SKYLIN,Skyline,,Southwest,1,Yes
 SLPRKE,South Lakes Park East,,Central,,Yes
 SLPRKW,South Lakes Park West,,Central,,Yes
 SOONER,Sooner,,North Central,,
@@ -252,11 +269,13 @@ TEXOMA,Texoma,Texoma,South Central,,
 TEXRR,Texoma Red River Arm,Texoma,South Central,,
 TEXWR,Texoma Washita River Arm,Texoma,South Central,,
 THBIRD,Thunderbird,,Central,,
+THOMAS,Buck Thomas,,Central,,Yes
 UPILLR,Upper Illinois River,,,,
 VANDER,Vanderwork,,Northwest,,
 VIAN,Vian,,East Central,,
 VINCEN,Lake Lloyd Vincent,,Northwest,,
 WARD,Ward,,Southeast,,
+WATERW,Waterworks,,Northwest,3.5,Yes
 WATONG,Watonga,,Northwest,,
 WAURIK,Waurika,,Southwest,,
 WAXHOM,Waxhoma,,North Central,,
