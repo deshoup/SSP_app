@@ -456,137 +456,204 @@ fluidPage(
      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       tabPanel("Statewide Percentiles", 
          hr(),
-         
-         #parameter selection column on left
-         column(4,
-            sidebarPanel(width = 12,
-               h4("Select parameters for percentile calculations", align="center"),
-               hr(),
-               
-               ###selectize boxes for parameterizing percentile calculations
-               
-                #gear code, choices on server.r
-                  div(style="display:inline-block",
-                      selectizeInput("selPercGear", "Gear Code(s):", choices = NULL,
-                           multiple = TRUE, options = list(placeholder = "click/type here"))
-                    ),
+         mainPanel(width=12,
+           fluidRow(
+             #parameter selection column on left
+             column(4,
+                #sidebarPanel(width = 12,
+                  wellPanel(
+                     h4("Select survey criteria for calculating percentiles", align="center"),
+                     hr(),
+                     
+                     ###selectize boxes for parameterizing percentile calculations
+                     
+                      #gear code, choices on server.r
+                        div(style="display:inline-block",
+                            selectizeInput("selPercGear", "Gear Code(s):", choices = NULL,
+                                 multiple = TRUE, options = list(placeholder = "click/type here"))
+                          ),
+                   
+                      #gear name, choices on server.r
+                        div(style="display:inline-block",
+                            selectizeInput("selPercGearNm", "Gear Name(s):", choices = NULL, 
+                                 multiple = TRUE, options = list(placeholder = "click/type here"))
+                          ),
+      
+                      uiOutput("lineBrk"), #create hard return
+      
+                      #select Species code, choices processed on server.r
+                        div(style="display:inline-block",#uiOutput("selSppPerc")), 
+                            selectizeInput("selPercSpp", "Species Code(s):", choices = NULL,
+                                  multiple = TRUE, options = list(placeholder = "click/type here"))
+                          ),
+                
+                      #select species name, choices processed on server.r
+                        div(style="display:inline-block",selectizeInput("selPercSppNm", "Species Name(s):", width = "100%",
+                            choices = NULL,multiple = TRUE, options = list(placeholder ="click/type here"))
+                          ),  
+                  
+                      #Year slider
+                       sliderInput("perYrs", "Year Range", min = 1980,
+                           max = as.numeric(format(Sys.Date(), "%Y")), sep = "", step=1,
+                           value = c(2010, as.numeric(format(Sys.Date(), "%Y")))),
+      
+                      #Region selection box
+                        selectizeInput("selRegionPerc", "Management Region(s):", choices = unique(lakeinfo$ODWC.Region),
+                            multiple = TRUE, options=list(placeholder = "click/type here")),
+      
+                      #Lake code, choices processed on server.r
+                         div(style="display:inline-block",
+                             selectizeInput("selLakeCodePerc", "Lake Code(s):", choices = NULL, multiple = TRUE, 
+                                options = list(placeholder = "click/type here"))
+                            ),
+                     
+                       #Lake name, choices processed on server.r
+                         div(style="display:inline-block",
+                             selectizeInput("selLakeNamePerc", "Lake Name(s):", choices = NULL,multiple =
+                                  TRUE, options = list(placeholder = "click/type here"))
+                            ),
+                     helpText("All codes can be referenced in the SSP Manual tab."),
+                  ),
+                  
+                  #Percentile customization
+                  wellPanel(
+                   #Custom percentiles to calculate
+                       uiOutput("percentileInptBox"), #create input box for specifying desired percentiles...code generated on server.r side
+                   ),
+                  
+                  #criteria for deciding data quality required in percentile calculations
+                  wellPanel(
+                     h4("Set minimum data quality parameters determining how much data is required to include surveys in percentile calculations", align="center"),
+                     hr(),
+                     
+                      #Slider for min # surveys on which to calculate percentiles
+                          #Set up css info for a reverse highlighting of slider (blue right of the marker)
+                           tags$style(HTML("
+                                  #reverseSlider .irs-bar {border-top: 1px solid #ddd;
+                                    border-bottom: 1px solid #ddd;background: linear-gradient(to bottom, #DDD -50%, 
+                                    #FFF 150%);
+                                  }
+                                  #reverseSlider .irs-bar-edge {
+                                    border: 1px solid #ddd;
+                                    background: linear-gradient(to bottom, #DDD -50%, #FFF 150%);
+                                    border-right: 0;
+                                  }
+                                  #reverseSlider .irs-line {
+                                    background: #428bca;
+                                    border: 1px solid #428bca;
+                                  }
+                                ")),
+                          div(id = "reverseSlider",
+                              uiOutput("min_survey")
+                              # sliderInput(inputId = "N_SurveyMin", label = 
+                              #   "Min # of surveys for which to calculate percentiles", 
+                              #   min = 3, max = 100, sep = "", step=1, value = 10)
+                           ),
+                            #note: selPerctls() has list of percentiles to use
+                     
+                      #Slider for min # stock size fish before calculate PSD
+                          div(id = "reverseSlider",
+                              sliderInput(inputId = "N_PSDMin", label = 
+                                "Min # of stock-size fish required before including a survey's PSD value percentile calculation", 
+                                min = 10, max = 100, sep = "", step=1, value = 40)
+                                #95% CI's are +/- 25 PSD units with N=25 stock fish...so default to no smaller than 25 on this.
+                                #with N=40, CI is +/- 19...probably more realistic for default table with 5 percentiles.
+                                #See Gustafson 1998 NAJFM 8:139-141
+                           ),
+                     
+                      #Slider for min # Wr values for Wr percentiles
+                          div(id = "reverseSlider",
+                              sliderInput(inputId = "Min_Wr_N", label = 
+                                       "Min # of Wr values required before including survey's average Wr in percentile calculation", 
+                                     min = 3, max = 100, sep = "", step=1, value = 5)
+                          ),
+                     
+                      #Slider for min # aged fish...calculated on server side to have max value
+                          div(id = "reverseSlider",
+                              uiOutput("NAgedMinSlider")
+                           ),
+                                     
+                     #Slider for min # fish in age class for mean length/wt at age percentiles
+                          div(id = "reverseSlider",
+                              sliderInput(inputId = "Min_N_at_Age", label = 
+                                    "Min # fish required in an age class before using it for mean length/weight at age percentile calculation", 
+                                     min = 3, max = 100, sep = "", step=1, value = 5)
+                          ),
+                     
+                     #Slider for min R^2 for using mortality data
+                          div(id = "reverseSlider",
+                              sliderInput(inputId = "Min_Mort_R2", label = div(HTML(
+                                "Min R<sup>2</sup> from catch curve before using survey for mortality percentile calculation")), 
+                                 min = 0.65, max = 1.0, sep = "", step=0.01, value = 0.80)
+                          ),
+                     
+                     helpText("Note: a survey is a combination of data from all sites sampled with the same gear, lake, and year.")
+                     
+                  ),
+                   
+                #)
+              ),
              
-                #gear name, choices on server.r
-                  div(style="display:inline-block",
-                      selectizeInput("selPercGearNm", "Gear Name(s):", choices = NULL, 
-                           multiple = TRUE, options = list(placeholder = "click/type here"))
+            # Column with percentile tables in it
+             column(8,
+                conditionalPanel(
+                  condition = "input.selPercGear != '' || input.selPercSpp != '' ", #hide output until gear or spp selected
+                    wellPanel(
+                        span(textOutput("Max_TL_Wt_Text"),style="font-size:175%"),
+                        tableOutput("Max_TL_Wt_perc"),
+                        h4(checkboxInput("Max_TL_WT_inch_lb", "Display Measurements in English Units (in & lbs)", value = FALSE)),
+                        helpText("Default is metric (mm and g). Checkbox changes units to inches and lbs.")
+                        
                     ),
-
-                uiOutput("lineBrk"), #create hard return
-
-                #select Species code, choices processed on server.r
-                  div(style="display:inline-block",#uiOutput("selSppPerc")), 
-                      selectizeInput("selPercSpp", "Species Code(s):", choices = NULL,
-                            multiple = TRUE, options = list(placeholder = "click/type here"))
+                    wellPanel(
+                      span(textOutput("CPUEpercText"),style="font-size:175%"),
+                      tableOutput("CPUEperc")
                     ),
-          
-                #select species name, choices processed on server.r
-                  div(style="display:inline-block",selectizeInput("selPercSppNm", "Species Name(s):", width = "100%",
-                      choices = NULL,multiple = TRUE, options = list(placeholder ="click/type here"))
-                    ),  
-            
-                #date slider
-                 sliderInput("perYrs", "Year Range", min = 1980,
-                     max = as.numeric(format(Sys.Date(), "%Y")), sep = "", step=1,
-                     value = c(2010, as.numeric(format(Sys.Date(), "%Y")))),
-
-                #Region selection box
-                  selectizeInput("selRegionPerc", "Management Region(s):", choices = unique(lakeinfo$ODWC.Region),
-                      multiple = TRUE, options=list(placeholder = "click/type here")),
-
-                #Lake code, choices processed on server.r
-                   div(style="display:inline-block",
-                       selectizeInput("selLakeCodePerc", "Lake Code(s):", choices = NULL, multiple = TRUE, 
-                          options = list(placeholder = "click/type here"))
-                      ),
-               
-                 #Lake name, choices processed on server.r
-                   div(style="display:inline-block",
-                       selectizeInput("selLakeNamePerc", "Lake Name(s):", choices = NULL,multiple =
-                            TRUE, options = list(placeholder = "click/type here"))
-                      ),
-               
-                #Slider for min # surveys on which to calculate percentiles
-                    #Set up css info for a reverse highlighting of slider (blue right of the marker)
-                     tags$style(HTML("
-                            #reverseSlider .irs-bar {border-top: 1px solid #ddd;
-                              border-bottom: 1px solid #ddd;background: linear-gradient(to bottom, #DDD -50%, 
-                              #FFF 150%);
-                            }
-                            #reverseSlider .irs-bar-edge {
-                              border: 1px solid #ddd;
-                              background: linear-gradient(to bottom, #DDD -50%, #FFF 150%);
-                              border-right: 0;
-                            }
-                            #reverseSlider .irs-line {
-                              background: #428bca;
-                              border: 1px solid #428bca;
-                            }
-                          ")),
-                    div(id = "reverseSlider",
-                        uiOutput("min_survey")
-                        # sliderInput(inputId = "N_SurveyMin", label = 
-                        #   "Min # of surveys for which to calculate percentiles", 
-                        #   min = 3, max = 100, sep = "", step=1, value = 10)
-                     ),
-                      #selPerctls() has list of percentiles to use
-               
-                #Slider for min # stock size fish before calculate PSD
-                    div(id = "reverseSlider",
-                        sliderInput(inputId = "N_PSDMin", label = 
-                          "Min # of stock-size fish before use sample for PSD calculation", 
-                          min = 10, max = 100, sep = "", step=1, value = 40)
-                     ),
-               
-                #Slider for min # aged fish...calculated on server side to have max value
-                    div(id = "reverseSlider",
-                        uiOutput("NAgedMinSlider")
-                     ),
-
-                #Custom percentiles to calculate
-                 uiOutput("percentileInptBox"), #create input box for specifying desired percentiles...code generated on server.r side
-
-              helpText("All codes can be referenced in the SSP Manual tab.")
-                  )
-          ),
+                    wellPanel(
+                      span(textOutput("PSDpercText"),style="font-size:175%"),
+                      tableOutput("PSDperc")
+                    ),
+                    wellPanel(
+                      span(textOutput("WrpercText"),style="font-size:175%"),
+                      tableOutput("Wrperc")
+                    ),
+                    wellPanel(
+                      span(textOutput("MLApercText"),style="font-size:175%"),
+                      tableOutput("MLAperc"),
+                      h4(checkboxInput("MLA_inch", "Display Measurements in English Units (inches)", value = FALSE)),
+                      helpText("Default is metric (mm). Checkbox changes units to inches.")
+                      
+                    ),
+                    wellPanel(
+                      span(textOutput("MWtApercText"),style="font-size:175%"),
+                      tableOutput("MWtAperc"),
+                      h4(checkboxInput("MWtA_lb", "Display Measurements in English Units (pounds)", value = FALSE)),
+                      helpText("Default is metric (g). Checkbox changes units to pounds.")
+                    ),
+                  
+                    wellPanel(
+                      span(textOutput("MortpercText"),style="font-size:175%"),
+                      tableOutput("Mortperc")
+                    )
+                ),
+                      
+                      #stuff to delete after done debugging
+                      
+                      # h3("testing raw data"),
+                      # hr(),
+                      # DT::dataTableOutput("selPercDataTbl"),
+                      #   #tableOutput("selPercDataTbl")
+                      
+                      # h3("testing age data"),
+                      # DT::dataTableOutput("selPercAgedTbl")
+                      # 
+                      # h3("testing sortAge table"),
+                      # DT::dataTableOutput("test"),
+                      
+              )
+           )
+         ),
          
-        # Column with percentile tables in it
-         column(8,
-                wellPanel(
-                  # h4(textOutput("firstRun")),
-                  # h4("PercToProp"),
-                  # tableOutput("test2"),
-                  # h4("Percentiles df"),
-                  # tableOutput("test"),
-
-
-                  #h3("CPUE"),
-                  #hr(),
-                  
-                  span(textOutput("Max_TL_Wt_Text"),style="font-size:175%"),
-                  tableOutput("Max_TL_Wt_perc"),
-                  span(textOutput("CPUEpercText"),style="font-size:175%"),
-                  tableOutput("CPUEperc"),
-                  span(textOutput("PSDpercText"),style="font-size:175%"),
-                  tableOutput("PSDperc"),
-                  
-                  
-                  #stuff to delete after done debugging
-                  h3("testing raw data"),
-                  hr(),
-                  #tableOutput("selPercDataTbl")
-                  DT::dataTableOutput("selPercDataTbl"),
-                  
-                  h3("testing age data"),
-                  DT::dataTableOutput("selPercAgedTbl")
-                  
-                )
-          )
       ),
      
      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -597,7 +664,7 @@ fluidPage(
            mainPanel(width=12,
              fluidRow(
                
-               #selection criteria pannel on left
+               #selection criteria panel on left
                column(4,
                  wellPanel(
                    h4("Use this tab to find out what was stocked in a particular water body.  This feature

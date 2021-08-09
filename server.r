@@ -1619,7 +1619,6 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
   #load initial data
   percentileData <- reactive({
     percentileData <- read.csv("PercentileData.csv")  #use this when we go live
-    #percentileData <- read.csv("PercData2005.csv")  #Dan using this for testing to save time...only data >2005
       percentileData
       })
   
@@ -1629,8 +1628,8 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         waiting_screen <- tagList(
           #spin_flower(),#spin_loaders(id=32, color = "red", style = NULL),#spin_ball(),
           spin_whirly(),
-          #need to move text down or spinner ends up on top of it, so add two br()
-          h4(br(),br(),"Please wait while the app loads the percentile data...this may take several second")
+            #need to move text down or spinner ends up on top of it, so add two br()
+            h4(br(),br(),"Please wait while the app loads the percentile data...this may take several second")
         ) 
        
       #code creates a line break
@@ -1639,13 +1638,13 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     #Create N_agedMin slider on server side to get max age info
         maxN_aged <- reactive({max(percentileData()$N_aged, na.rm=TRUE)})
         output$NAgedMinSlider <- renderUI({sliderInput(inputId = "N_agedMin", label = 
-               "Min # of aged fish used for growth/mortality metrics", min = 20, max = maxN_aged(), sep = "", step=1, value = 50)
+               "Min # of aged fish required before using a survey's growth/mortality metrics in percentiles", min = 30, max = maxN_aged(), sep = "", step=1, value = 50)
         })
         
       #Percentiles selectize box
         output$percentileInptBox <- renderUI({
-          waiter_show(html = waiting_screen, color = "#33E8FF") #puts up loading screen from waiter package
-                on.exit(waiter_hide()) #removes loading screen once renderUI complete
+          # waiter_show(html = waiting_screen, color = "#33E8FF") #puts up loading screen from waiter package
+          #       on.exit(waiter_hide()) #removes loading screen once renderUI complete
             selectizeInput("percentileInpt", "To customize percentiles produced, type desired values in this box",
                 "Percentiles:",choices = c(paste(1:99,rep("%",99),sep="")),multiple = TRUE, 
                 options = list(placeholder = "click/type here"))
@@ -1655,17 +1654,17 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
             PercToProp = data.frame(prop = (c(seq(0.01,0.99, by= 0.01)))) %>% 
               mutate(perc = paste(prop  *100, "%", sep = ""))
             selPerctls <- Vectorize(reactive({if(is.null(input$percentileInpt)){
-                selPerctls <- c(0.05,0.15,0.25,0.5,0.75,0.85,0.95)#sets default percentages
+                selPerctls <- c(0.05,0.25,0.5,0.75,0.95)#sets default percentages
               }else{   #unless user specified percentiles to use
                 selPerctls <- as.numeric(unlist((left_join(data.frame(input$percentileInpt),PercToProp,by=c("input.percentileInpt"="perc")) %>%
                  select(-"input.percentileInpt"))))}})) #reads from percentile selectize box and converts to proportion.
                 
     #Create N_SurveyMin slider on server side to get min # surveys to use and set it to # percentiles requested by default
-      N_perc_columns <- reactive({length(selPerctls())}) #this is not working
+      N_perc_columns <- reactive({length(selPerctls())}) 
       output$min_survey <- renderUI({sliderInput(inputId = "N_SurveyMin", label = 
             "Min # of surveys for which to calculate percentiles", 
             #min = 3, max = 100, sep = "", step=1, value = 10)
-            min = 3, max = 100, sep = "", step=1, value = N_perc_columns())
+            min = 3, max = 100, sep = "", step=1, value = N_perc_columns()*2)
       })
         
   
@@ -1715,6 +1714,8 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         
     #update selectize boxes from Code to Name and server-side processing choices (is faster than ui.r)
     observe({withProgress(message = "Loading Cross-pop Code to Name Data",min=0,max=10,value=1, {
+      freezeReactiveValue(input, "selPercGearNm")
+      freezeReactiveValue(input, "selPercSppNm")
       if(is.null(input$selPercGear)){
           updateSelectizeInput(session, "selPercGearNm", selected = NULL, choices = sort.default(gearinfo$Gear.Name),
           server = TRUE)
@@ -1739,6 +1740,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
        
       #create Gear Code observer function to set choices and default selected item on first run
       observe({withProgress(message = "Loading Cross-pop Name to Code Data",min=0,max=10,value=1, {
+        freezeReactiveValue(input, "selPercGear")
          updateSelectizeInput(session, "selPercGear", choices = sort.default(gearinfo$Gear.Code),
             selected = input$selectgear, server = TRUE)
         # updateSelectizeInput(session, "selPercGear", choices = sort.default(percentileData()$Gear.Code),
@@ -1747,6 +1749,7 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       
       #create Species Code observer function to set choices and default selected item on first run
       observe({withProgress(message = "Loading Cross-pop Name to Code Data",min=0,max=10,value=1, {
+        freezeReactiveValue(input, "selPercSpp")
          updateSelectizeInput(session, "selPercSpp", choices = sort.default(speciesinfo$Species.Code),
             selected = input$selectspecies, server = TRUE)
         # updateSelectizeInput(session, "selPercSpp", choices = sort.default(percentileData()$Species.Code),
@@ -1780,9 +1783,12 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     })
       
     #Create age-related data based on N_agedMin slider input
-    selPercData_age <- reactive({
-      selPercData_age <- subset(percentileData(), N_aged >= input$N_agedMin)
-    })
+    # selPercData_age <- reactive({
+    #   selPercData_age <- subset(percentileData(), N_aged >= input$N_agedMin)
+    # })
+      #decided not to use the above...it is not inheriting the filtering done with percentileData and it is just
+      #as easy to filter for N_aged when I make the percentile table
+      
     #Create sort files for all tables that include PSD values
     #SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","memorable","trophy"),sortOrder=c(1,2,3,4,5,6,7))
       ###moved above line to top of program as we will use for regular SSP table sorting when adding Trophy category back into code
@@ -1794,20 +1800,31 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
     maxTL_WT_percTable <- reactive({
       maxTL_Wt <- selPercData() %>% group_by(Species.Code) %>% 
           select(SurveyID:Species.Code, maxTL:N_maxWt) %>% 
-          pivot_longer(cols = c(maxTL, maxWt), names_to = "Metric", values_to="Values")
+          pivot_longer(cols = c(maxTL, maxWt), names_to = "Metric", values_to = "Values")
+      
+      maxTL_Wt <- if(input$Max_TL_WT_inch_lb==TRUE){#converts length from mm to inches and weight from g to Lb
+        maxTL_Wt %>% mutate(Values = case_when(Metric=="maxTL" ~ Values * 0.0393701,
+                                               Metric=="maxWt" ~ Values * 0.00220462))
+      }else{
+        maxTL_Wt
+      }
   
-      Nsurveys <- maxTL_Wt %>% subset(!is.na(Values)) %>% group_by(Species.Code,Metric) %>%
+      Nsurveys <- maxTL_Wt %>% subset(!is.na(Values)) %>% group_by(Species.Code, Metric) %>%
         summarise("# Surveys"=n(),.groups = "drop_last")
           
       maxTL_WT_percMetrics <- maxTL_Wt%>% group_by(Species.Code, Metric) %>%
         group_modify(~{quantile(.x$Values, probs = selPerctls(), na.rm = TRUE) %>% tibble::enframe()}) %>%
-        mutate(value2 = case_when(Metric == "maxTL" ~ as.character(round(value, 0)),
-                                Metric == "maxWt" ~ as.character(format(round(value, 1), nsmall = 1)))) %>%
+        mutate(value2 = case_when(
+          input$Max_TL_WT_inch_lb==FALSE & Metric == "maxTL" ~ as.character(round(value, 0)),
+          input$Max_TL_WT_inch_lb==FALSE & Metric == "maxWt" ~ as.character(format(round(value, 0))),
+          input$Max_TL_WT_inch_lb==TRUE & Metric == "maxTL" ~ as.character(round(value, 1)),
+          input$Max_TL_WT_inch_lb==TRUE & Metric == "maxWt" ~ as.character(format(round(value, 2)))
+        )) %>%
         select(-value) %>%
         pivot_wider(names_from = name, values_from = value2) %>%
         left_join(Nsurveys, by = c("Species.Code", "Metric")) %>%
         left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
-        mutate(Metric=recode(Metric, "maxTL" = "Maximum TL (mm)", "maxWt" = "Maximum Weight (g)")) %>% #rename metric values
+        mutate(Metric=recode(Metric, "maxTL" = "Maximum TL", "maxWt" = "Maximum Weight")) %>% #rename metric values
         rename("Species Name" = "Species.Name") %>%
         arrange(Metric, "Species Name") %>%
         ungroup() %>% as.data.frame() %>% select(-Species.Code) 
@@ -1821,36 +1838,32 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
  
     
   #CPUE percentile table calculation
-    SortCPUE <- SortPSD %>% mutate(metric_cat = paste("CPUE", SortPSD$PSDname, sep=""), 
-        cat_title = paste("CPUE-", SortPSD$PSDname, sep = "")) %>% 
+    SortCPUE <- SortPSD %>% mutate(CPUEmetric = paste("CPUE", SortPSD$PSDname, sep=""),
+        cat_title = paste("CPUE-", SortPSD$PSDname, sep = "")) %>%
         mutate(cat_title = replace(cat_title, cat_title == "CPUE-", "Overall CPUE")) %>% select(-PSDname)
 
     CPUEpercTable <- reactive({
-      if(!is.null(input$selPercGear)){
-        withProgress(message = "Loading CPUE table Data", min = 0, max = 10, value = 1, {
-          CPUEperc <- selPercData() %>% select(SurveyID:Nsites, CPUE:CPUEtrophy) %>% group_by(Species.Code) %>% 
-            pivot_longer(cols = CPUE:CPUEtrophy, names_to = "metric_cat", values_to="metricVal")
-          
-          Nsurveys <- CPUEperc %>% subset(!is.na(metricVal)) %>% group_by(Species.Code, metric_cat) %>% 
-            summarise("# Surveys" = n(), .groups = "drop_last")
-          
-          CPUEpercMetrics <- CPUEperc %>% 
-            group_by(Species.Code, metric_cat) %>% 
-            group_modify(~{quantile(.x$metricVal, probs=selPerctls(), na.rm = TRUE) %>% 
-                tibble::enframe()}) %>% 
-                  pivot_wider(names_from = name, values_from = value) %>% 
-                  left_join(Nsurveys, by = c("Species.Code", "metric_cat")) %>% 
-                  left_join(SortCPUE, by = "metric_cat") %>% arrange(Species.Code, sortOrder) %>% 
-                  left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name, cat_title) %>% 
-                  ungroup() %>% 
-                  select(-sortOrder, -metric_cat, -Species.Code) %>% 
-                  rename("Species Name" = "Species.Name", "CPUE category" = "cat_title")
-            #note above group_modify() iterates a function on groups of data, but returns an atomic vector that needs to be parsed into
-            #columns by enframe() to make a data fame
-          CPUEpercTable <- CPUEpercMetrics[complete.cases(CPUEpercMetrics[,"# Surveys"]) & #remove NA's
-                                             CPUEpercMetrics$"# Surveys" >= input$N_SurveyMin,] #remove rows based on too few surveys
-        })
-      }
+            #change selPercData to selPercData() in final code
+      CPUEperc <- selPercData() %>% group_by(Species.Code) %>% 
+        select(SurveyID:Nsites, CPUE:CPUEtrophy, -maxTL, -N_maxTL,-maxWt, -N_maxWt) %>% 
+        pivot_longer(cols = CPUE:CPUEtrophy, names_to = "CPUEmetric", values_to="CPUEVal") 
+        
+      Nsurveys <- CPUEperc %>% group_by(Species.Code,CPUEmetric) %>% 
+        summarise("N_Surveys"=n(),.groups = "drop_last")
+      
+     CPUEpercMetrics <- CPUEperc %>% 
+        left_join(Nsurveys, by = c("Species.Code", "CPUEmetric")) %>% 
+        filter(N_Surveys >= input$N_SurveyMin) %>%
+        #   ## replace N_SurveyMin with input$N_SurveyMin above in shiny app
+        group_by(Species.Code, CPUEmetric, N_Surveys) %>% 
+        group_modify(~{quantile(.x$CPUEVal, probs = selPerctls(), na.rm = TRUE) %>%tibble::enframe()}) %>%  
+        pivot_wider(names_from = name,values_from = value) %>%
+        left_join(SortCPUE, by="CPUEmetric") %>% arrange(Species.Code, sortOrder) %>%
+        left_join(speciesinfo, by="Species.Code") %>% relocate(Species.Name) %>%
+        relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
+        select(-sortOrder, -CPUEmetric, -Species.Code) %>%
+        relocate(cat_title, .after = Species.Name) %>%
+        rename("Species Name" = "Species.Name", "CPUE Category" = "cat_title", "# Surveys" = "N_Surveys")
     })
 
     #PSD percentile calculations
@@ -1863,8 +1876,8 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
       Nsurveys <- PSDperc %>% group_by(Species.Code,PSDmetric) %>% 
         summarise("N_Surveys"=n(),.groups = "drop_last")
       
-      PSDsortOrder <- data.frame(PSDmetric=c("PSD_S.Q", "PSD_Q.P", "PSD_P.M", "PSD_M.T",
-                                   "PSD", "PSD.P", "PSD.M", "PSD.T"), sortOrder=1:8)
+      PSDsortOrder <- data.frame(PSDmetric=c("PSD", "PSD.P", "PSD.M", "PSD.T", 
+                                   "PSD_S.Q", "PSD_Q.P", "PSD_P.M", "PSD_M.T"), sortOrder=1:8)
       PSDpercMetrics <- PSDperc %>% 
         left_join(Nsurveys, by=c("Species.Code","PSDmetric")) %>% 
         filter(N_Surveys >= input$N_SurveyMin) %>% 
@@ -1879,85 +1892,301 @@ SortPSD <- data.frame(PSDname=c("","substock","stock","quality","preferred","mem
         relocate("PSD Metric", .after = Species.Name) %>% 
         select(-sortOrder, -PSDmetric, -Species.Code) 
     })
+    
+    #Wr percentile calculations
+    WrpercTable <- reactive({
+        selPercDataWr <- selPercData() %>% select(SurveyID:Nsites, Species.Code, Nfish, N_Wr:Wr.trophy) %>%
+          rename(N_Wr.total = N_Wr, Wr.total=Wr) %>%
+          pivot_longer(cols = N_Wr.total:Wr.trophy, names_to = c(".value", "PSD_cat"), names_sep = "\\.", 
+                       values_drop_na = TRUE)
+                        #note \\ is needed in names_sep to identify the period is not a function but is the ASCI period
 
+        selPercDataWr$Wr[selPercDataWr$N_Wr < input$Min_Wr_N] <- NA #remove Wr values with too few fish so it does not skew percentile
+            #need to replace Min_Wr_N with input$Min_Wr_N or whatever function produces this value in shiny app
+
+        WrPerc <- subset(selPercDataWr, !is.na(Wr)) #drop NA's
+
+        NsurveysWr <- WrPerc %>% group_by(Species.Code, PSD_cat) %>%
+          summarise("N_Surveys"=n(),.groups = "drop_last")
+
+        SortWr <- data.frame(PSD_cat=c("total","substock","stock","quality","preferred","memorable","trophy"),
+                                          sortOrder=1:7)
+
+        WrPercMetrics <- WrPerc %>%
+          left_join(NsurveysWr, by = c("Species.Code","PSD_cat")) %>%
+            ## replace N_SurveyMin with input$N_SurveyMin below in shiny app
+          filter(N_Surveys >= input$N_SurveyMin) %>% group_by(Species.Code, PSD_cat, N_Surveys) %>%
+            ##replace selPerctls with selPerctls() below in shiny app
+          group_modify(~{quantile(.x$Wr, probs = selPerctls(),na.rm=TRUE) %>%tibble::enframe()}) %>%
+          pivot_wider(names_from = name, values_from = value) %>%
+          left_join(SortWr, by = "PSD_cat") %>% arrange(Species.Code, sortOrder) %>%
+          left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
+          relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
+          mutate("Wr Metric" = recode(PSD_cat, total = "Wr all sizes", substock = "Wr < stock size", stock =
+                          "Wr stock-quality size", quality = "Wr quality-preferred size", memorable =
+                          "Wr memorable-preferred size", preferred = "Wr preferred-memorable size",
+                          Trophy = "Wr > trophy size")) %>%
+          relocate("Wr Metric", .after = Species.Name) %>%
+          select(-sortOrder, -PSD_cat, -Species.Code)
+    })
+    
+    
+    #Mean TL at age (MLA) percentile calculations
+    MLApercTable <- reactive({
+      selPercDataMLA <- selPercData() %>% select(SurveyID:Nsites, N_aged, matches(c("MeanTL_Age", "MeanN_Age"))) %>%
+              pivot_longer(cols = matches(c("MeanTL_Age", "MeanN_Age")), names_to = c(".value", "Age"),
+                           names_sep = "_", values_drop_na = TRUE) %>%
+              filter(MeanN >= input$Min_N_at_Age & N_aged >= input$N_agedMin)
+      
+      SortAge <- data.frame(Age = unique(selPercDataMLA$Age))  %>%
+              mutate(sortOrder = as.numeric(sub("Age.", "", Age))) %>% #extract the age number by substituting null for the string "Age."
+              arrange(sortOrder)
+      
+      selPercDataMLA <- if(input$MLA_inch==TRUE){#converts length from mm to inches
+        selPercDataMLA %>% mutate(MeanTL = MeanTL * 0.0393701)
+      }else{
+        selPercDataMLA
+      }
+      
+      NsurveysMLA <- selPercDataMLA %>%
+        subset(!is.na(MeanTL)) %>%
+        group_by(Species.Code, Age) %>%
+        summarise("N_Surveys"=n(),.groups = "drop_last")
+
+      #Create MLA percentile table
+      MLAPercMetrics <- selPercDataMLA %>%
+        left_join(NsurveysMLA, by = c("Species.Code", "Age")) %>%
+        filter(N_Surveys >= input$N_SurveyMin) %>%
+        group_by(Species.Code, Age, N_Surveys) %>%
+        group_modify(~{quantile(.x$MeanTL, probs = selPerctls(), na.rm = TRUE) %>% tibble::enframe()}) %>%
+        mutate(value = case_when(input$MLA_inch==FALSE ~ as.character(round(value, digits = 0)), 
+                                  TRUE ~ as.character(round(value, digits = 1)))) %>%
+        pivot_wider(names_from = name, values_from = value) %>%
+        left_join(SortAge, by = "Age") %>% arrange(Species.Code, sortOrder) %>%
+        left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
+        relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
+        mutate("Age class" = sub("\\.", "-", Age)) %>%  #replace periods with - in the age class column
+        relocate("Age class", .after = Species.Name) %>%
+        select(-sortOrder, -Age, -Species.Code)
+    })
+    
+    #Mean Wt at age (MWtA) percentile calculations
+    MWtApercTable <- reactive({
+      MWtApercTable <- selPercData() %>% select(SurveyID:Nsites, N_aged, matches(c("MeanWt_Age", "MeanN_Age"))) %>%
+        pivot_longer(cols = matches(c("MeanWt_Age", "MeanN_Age")), names_to = c(".value", "Age"),
+                     names_sep = "_", values_drop_na = TRUE) %>%
+        filter(MeanN >= input$Min_N_at_Age & N_aged >= input$N_agedMin)
+      
+      SortAge <- data.frame(Age = unique(MWtApercTable$Age))  %>%
+        mutate(sortOrder = as.numeric(sub("Age.", "", Age))) %>% #extract the age number by substituting null for the string "Age."
+        arrange(sortOrder)
+      
+      MWtApercTable <- if(input$MWtA_lb==TRUE){#converts weight from g to Lb
+        MWtApercTable %>% mutate(MeanWt = MeanWt * 0.00220462)
+      }else{
+        MWtApercTable
+      }
+      
+      NsurveysMWtA <- MWtApercTable %>%
+        subset(!is.na(MeanWt)) %>%
+        group_by(Species.Code, Age) %>%
+        summarise("N_Surveys"=n(),.groups = "drop_last")
+      
+      #Create mean Wt at age percentile table
+      MWtAPercMetrics <- MWtApercTable %>%
+        left_join(NsurveysMWtA, by = c("Species.Code", "Age")) %>%
+        filter(N_Surveys >= input$N_SurveyMin) %>%
+        ## replace N_SurveyMin with input$N_SurveyMin above in shiny app
+        group_by(Species.Code, Age, N_Surveys) %>%
+        group_modify(~{quantile(.x$MeanWt, probs = selPerctls(), na.rm = TRUE) %>% tibble::enframe()}) %>%
+        mutate(value = case_when(input$MWtA_lb==FALSE ~ as.character(round(value, digits = 0)), TRUE ~
+               as.character(round(value, digits = 2)))) %>%
+        pivot_wider(names_from = name, values_from = value) %>%
+        left_join(SortAge, by = "Age") %>% arrange(Species.Code, sortOrder) %>%
+        left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
+        relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
+        mutate("Age class" = sub("\\.", "-", Age)) %>%  #replace periods with "-" in the age class column
+        relocate("Age class", .after = Species.Name) %>%  
+        select(-sortOrder, -Age, -Species.Code) #%>% 
+    })
+    #Create mean Wt at age percentile table  
+    MortPercTable <- reactive({ 
+      MortPercTable <- selPercData() %>% select(SurveyID:Nsites, N_aged, matches(c("MeanN_Age")), Z:A) %>%
+        filter(N_aged >= input$N_agedMin & R2 >= input$Min_Mort_R2)
+            #need to replace N_agedMin with input$N_agedMin and Min_Mort_R2 with input$Min_Mort_R2 in shiny app
+        
+       NsurveyMort <- MortPercTable %>%
+        subset(!is.na(A)) %>%
+        group_by(Species.Code) %>%
+        summarise("N_Surveys"=n(),.groups = "drop_last")
+      
+       MortPercMetrics <- MortPercTable %>%
+        left_join(NsurveyMort, by = c("Species.Code")) %>%
+        filter(N_Surveys >= input$N_SurveyMin) %>%
+          ## replace N_SurveyMin with input$N_SurveyMin above in shiny app
+        group_by(Species.Code, N_Surveys) %>%
+        group_modify(~{quantile(.x$A, probs = selPerctls(), na.rm = TRUE) %>% tibble::enframe()}) %>%
+        mutate(value = as.character(paste(round(value, digits = 0), "%", sep = ""))) %>% 
+        pivot_wider(names_from = name, values_from = value) %>%
+        left_join(speciesinfo, by = "Species.Code") %>% relocate(Species.Name) %>%
+        relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
+        select(-Species.Code)  
+    })
+    
   ###Make percentile output tables##############################
-
     #Max TL and Wt output table
       output$Max_TL_Wt_perc <- renderTable(spacing = "xs", {
         if(!is.null(input$selPercGear) | !is.null(input$selPercSpp)){
-          if(nrow(selPercData() )>3){
+          if(apply(maxTL_WT_percTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
             maxTL_WT_percTable()
           }
         }
       })
       output$Max_TL_Wt_Text <- renderText({
         if(!is.null(input$selPercGear) | !is.null(input$selPercSpp)){
-            CPUEtext <- as.character("Maximum TL (mm) and Weight (g) Percentiles")
+          if(apply(maxTL_WT_percTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            if(input$Max_TL_WT_inch_lb==FALSE){
+              CPUEtext <- as.character("Maximum TL (mm) and Weight (g) Percentiles")
+            }else{
+              CPUEtext <- as.character("Maximum TL (inches) and Weight (lbs) Percentiles")
+            }
+          }else{
+            CPUEtext <- as.character("Maximum TL and Weight Percentiles - insufficent data exists to calculate percentiles, please select different parameters.")
+          }
+        }else{
+          # CPUEtext <- as.character(" ")
+          CPUEtext <- NULL
         }
        })
       
     #Put CPUE percentile data in CPUEpercTable into output table
       output$CPUEperc <- renderTable(digits = 2, spacing = "xs", {
         if(!is.null(input$selPercGear)){
-          if(nrow(selPercData() )>3){
-            CPUEpercTable()
+          if(length(input$selPercGear) == 1){
+            if(apply(CPUEpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+              CPUEpercTable()
+            }
           }
         }
       })
       output$CPUEpercText <- renderText({
-        if(!is.null(input$selPercGear)){
-          if(nrow(selPercData() )>3){
+        if(length(input$selPercGear) != 1){
+            CPUEtext <- as.character("CPUE Percentiles are only relvant within a single gear type.  Please select one and only one gear to see results.")
+        }else if(apply(CPUEpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
             CPUEtext <- as.character("CPUE Percentiles")
-          }else{
-            CPUEtext <- as.character("CPUE Percentiles - insufficent data exists to calculate percentiles, please select different parameters")
-          }
+        }else{
+            CPUEtext <- as.character("CPUE Percentiles - insufficent data exists to calculate percentiles, please select different parameters.")
         }
       })
       
     #Put PSD percentile data in PSDpercTable into output table
       output$PSDperc <- renderTable(digits = 0, spacing = "xs", {
         if(!is.null(input$selPercGear)){
-          if(nrow(selPercData() )>3){
-            PSDpercTable()
-          }
+            if(length(input$selPercGear) == 1){
+              if(apply(PSDpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+                PSDpercTable()
+              }
+            }
         } 
       })
       output$PSDpercText <- renderText({
-        if(!is.null(input$selPercGear)){
-          if(nrow(selPercData() )>3){
+        if(length(input$selPercGear) != 1){
+            CPUEtext <- as.character("PSD Percentiles - because most gears are strongly size biased, PSDs are only comparable within a single gear type.  Please select one and only one gear to see results.")
+          }else if(apply(PSDpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
             PSDtext <- as.character("PSD Percentiles")
           }else{
-            PSDtext <- as.character("PSD Percentiles - insufficent data exists to calculate percentiles, please select different parameters")
+            PSDtext <- as.character("PSD Percentiles - insufficent data exists to calculate percentiles, please select different parameters.")
+          }
+      })
+      
+    #Put Wr percentile data from WrpercTable into output table
+      output$Wrperc <- renderTable(digits = 0, spacing = "xs", {
+          if(apply(WrpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            WrpercTable()
+          }
+      })
+      output$WrpercText <- renderText({
+          if(apply(WrpercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            Wrtext <- as.character("Wr Percentiles")
+          }else{
+            Wrtext <- as.character("Wr Percentiles - insufficent data exists to calculate percentiles, please select different parameters.")
+          }
+      })
+     
+     #Put MLA (mean length at age) percentile data from  MLApercTable into output table
+      output$MLAperc <- renderTable(spacing = "xs", {
+          if(apply(MLApercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            MLApercTable()
+          }
+      })
+      output$MLApercText <- renderText({
+          if(apply(MLApercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            if(input$MLA_inch==FALSE){
+              Wrtext <- as.character("Mean Length-at-Age Percentiles (mm TL)")
+            }else{
+              Wrtext <- as.character("Mean Length-at-Age Percentiles (inches TL)")
+            }
+          }else{
+            Wrtext <- as.character("Mean Length-at-Age Percentiles - insufficent data exists to calculate percentiles, please select different survey criteria or data quality parameters.")
+          }
+      })
+      
+    #Put mean wt at age (MWtA) percentile data from  MWtApercTable into output table
+      output$MWtAperc <- renderTable(spacing = "xs", {
+            if(apply(MWtApercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns
+                MWtApercTable()
+            }
+          })
+      output$MWtApercText <- renderText({
+          if(apply(MWtApercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+                if(input$MWtA_lb==FALSE){
+                  Wrtext <- as.character("Mean Weight-at-Age Percentiles (g)")
+                }else{
+                  Wrtext <- as.character("Mean Weight-at-Age Percentiles (lbs)")
+                }
+              }else{
+                Wrtext <- as.character("Mean Weight-at-Age Percentiles - insufficent data exists to calculate percentiles, please select different survey criteria or data quality parameters.")
+              }
+      })
+      
+    #Put Mortality percentile data in MortPercTable into output table
+      output$Mortperc <- renderTable(spacing = "xs", {
+        if(!is.null(input$selPercGear)){
+          if(length(input$selPercGear) == 1){
+            if(apply(MortPercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+              MortPercTable()
+            }
           }
         }
       })
-      
-    #need to decide how to handle single-species analysis...group by species or only provide output if 1 spp selected
-    
-      #maybe need to make reverse slider to select min # surveys for all metrics...default = 5 but go down to 3?
-      #Also might want a min # fish/sample for all but CPUE metric?...but maybe not...adds noise but adds N too and probably unbiased
-      #Maybe is bigger issue for max TL and WT?
-    #Wr by PSD
-    #Max TL...need to change percentileData to do this?
-    #Max Wt
-    #mean length at ages
-    #
-  
+      output$MortpercText <- renderText({
+        if(length(input$selPercGear) != 1){
+            CPUEtext <- as.character("Because most gears are strongly size biased, mortality estimates are only comparable within a single gear type.  Please select one and only one gear to see results.")
+        }else if(apply(MortPercTable()[1,], MARGIN = 1, FUN = function(x) all(is.na(x)))==F){ #only show if first row does not have NA in all columns 
+            CPUEtext <- as.character("Annualized Mortality Percentiles")
+        }else{
+            CPUEtext <- as.character("Annualized Mortality Percentiles - insufficent data exists to calculate percentiles, please select different parameters.")
+        }
+      })
+
 # Note we can change the location of the withProgress box using code at
 # https://stackoverflow.com/questions/35037230/change-style-and-position-of-the-message-box-generated-by-withprogress
 
 #################
       
 ##Stuff Dan used for testing/developing this tab#  
-      output$firstRun <- renderText(input$N_agedMin)#{paste("GearRun=",GearRun)})
+
+  # output$selPercDataTbl <- DT::renderDataTable(selPercData())
+  # output$selPercAgedTbl <- DT::renderDataTable(selPercData_age() %>%
+  #          relocate(N_aged))
+
+      #output$firstRun <- renderText(input$N_agedMin)#{paste("GearRun=",GearRun)})
       #output$firstRun <- renderText({paste("first run=",FirstRun$GR)})
       #selPercData2 <- reactive({selPercData2 <- selPercData() })#has 84 columns w/o ODWC.Region  %>% select(!Nfish:A)
   #Stuff for debugging using table outputs  #output$percentileTable <- renderTable(CPUEpercTable())
   #output$perYrsTabl <- renderTable(input$perYrs)
-  output$selPercDataTbl <- DT::renderDataTable(selPercData())
-  output$selPercAgedTbl <- DT::renderDataTable(selPercData_age() %>% 
-           relocate(N_aged))
-  #output$test <- renderTable(data.frame(input$percentileInpt))
+
+  # output$test <- DT::renderDataTable(SortAge())
   # output$test <- renderTable(data.frame(selPerctls()))
   # output$test2 <- renderTable(data.frame(PercToProp))
   #  output$test <- renderTable(data.frame(selPercData2()))
