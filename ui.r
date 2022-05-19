@@ -1,38 +1,35 @@
 #Packages to be installed and loaded############################
 library(shiny)
 library(shinyjs)
+# library(profvis) #for profiling
 library(DT)
-library(V8)#package needed to refresh page...only used if we upload csv files
-library(waiter) #produces spinning icon loading screen for percentiles tab (may want to do on main tab too?)
-library(bslib) #Theming package for Shiny
-
-jsResetCode <- "shinyjs.reset = function() {history.go(0)}" #Javascript needed to refresh page...will only need on file upload screen
-thematic::thematic_shiny(font = "auto")
+library(fst)
+library(data.table)
+# library(periscope)#trying this to make downloadable figures
 
 #.csv's to read in#############################################
-gearinfo <- read.csv("gearinfo.csv")
-lakeinfo <- read.csv("lakeinfo.csv")
-yearmonthinfo <- read.csv("yearmonthinfo.csv")
-speciesinfo <- read.csv("speciesinfo.csv")
-stockingData <- read.csv("stockingdata.csv")
+lakeinfo <- read.fst("lakeinfo.fst", as.data.table = TRUE)
+stockingData <- read.fst("stockingData.fst", as.data.table = TRUE)
 
 #start main ui.r code#########
 fluidPage(
-  #theme = bs_theme(),  #use bslib theme package...add customizations in parentheses
-  use_waiter(),  #establish waiter function for loading screen
   tags$head(tags$link(rel = "icon", type = "image/png", href = "ODWClogo.gif"),
             tags$title("OK Fishery Analysis App")),
-    useShinyjs(),
+  useShinyjs(),
   
-  tags$head(tags$style(".shiny-progress {top: 50% !important;left: 50% !important;margin-top: -100px !important;margin-left: -250px !important; color: blue;font-size: 20px;font-style: italic;}")),
-  #tags$head(tags$style(".shiny-progress {top: 50%;left: 50%;margin-top: -100px !important;margin-left: -250px; color: blue;font-size: 20px;font-style: italic;}")),
-  
-  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  # Application title with ODWC logos#####
-  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  tags$head(tags$style(".shiny-progress {color:blue; font-size:200%; font-style: italic;}")),
+  tags$head(tags$style(".shiny-notification {position:fixed; top:40% ;left:30%; font-size:200%; 
+                       width:40%; opacity:0.95; z-index:9999;}")),
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Application title with ODWC logos#####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   titlePanel(
     wellPanel(
         fluidRow(
+          
+          
+   # profvis_ui("profiler"), adds button to start profiling for debugging and speed measurement
         column(3,align="center", img(src="ODWClogo.gif", height="auto", width="150px")),
         column(6, align="center", h2("Oklahoma Fishery Analysis Application"),
                hr(), 
@@ -45,137 +42,79 @@ fluidPage(
   
  # Menu structure with main functions of app. Each "tabPanel" line makes another tab with code for each page underneath
   tabsetPanel(id="tabs", type = c("tabs"),
-    
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Select Sample Tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+              
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Select Sample Tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
      tabPanel("Select Sample",
       hr(),  
         fluidRow(
-          #Code from left select section of main data selection tab
-          column(4,
-            sidebarPanel(width = 12,
-              h4("Filter Dataset by Codes", align="center"),
-              hr(),
+          
+            # profvis_ui("profiler"),
+    
+            #Code from left select section of main data selection tab...right side select boxes below in diff section
+            column(6,
+              sidebarPanel(width = 12,
+                h4("Select criteria for data to analyze", align="center"),
+                checkboxInput("toggleCodeName", "Check box to filter by codes, uncheck to filter by name-code", value = FALSE),
+                hr(),
+             
+                uiOutput("selectLakeBox"),
               
-            #choices for below selectize boxes are processed in server.r
-              # selectizeInput(
-              #   "selectlake", "Lake Code(s):", choices = lakeinfo$Lake.Code,   
-              #     multiple = TRUE, options = list(placeholder = "click/type here")
-              # ),
-              selectizeInput(
-                "selectlake", "Lake Code(s):", choices = NULL,   
-                  multiple = TRUE, options = list(placeholder = "click/type here")
-              ),
-              # selectizeInput(
-              #   "selectyear", "Year(s):", choices = yearmonthinfo$Year,
-              #   multiple = TRUE, options = list(placeholder = "click/type here")
-              # ),
-              selectizeInput(
-                "selectyear", "Year(s):", choices = NULL,
-                multiple = TRUE, options = list(placeholder = "click/type here")
-              ),
-              # selectizeInput(
-              #   "selectmonth", "Month(s):", choices = yearmonthinfo$Month,
-              #   multiple = TRUE, options = list(placeholder = "click/type here")
-              # ),
-              selectizeInput(
-                "selectmonth", "Month(s):", choices = NULL,
-                multiple = TRUE, options = list(placeholder = "click/type here")
-              ),
-              # selectizeInput(
-              #   "selectgear", "Gear Code(s):", choices = gearinfo$Gear.Code,
-              #     multiple = TRUE, options = list(placeholder = "click/type here")
-              # ),
-               selectizeInput(
-                "selectgear", "Gear Code(s):", choices = NULL,
-                  multiple = TRUE, options = list(placeholder = "click/type here")
-              ),
-              helpText("All codes can be referenced in the SSP Manual tab.")
+                uiOutput("selectYearBox"),
+              
+                uiOutput("selectMonthBox"),
+                
+                uiOutput("selectGearBox"),
+                
+                actionButton("clearBoxes","Clear all criteria"),
+              )
+            ),
+           
+          #Data selection summary - renderText to show full names of lakes, gears, species
+           column(6, align = "center",
+            mainPanel(width = 12, 
+              wellPanel(        
+                h4("Sample Selection Summary"),
+                hr(),
+                  h4(textOutput("clearBoxesButton")),
+                  h4(textOutput("lakename")),
+                  h4(textOutput("year")),
+                  h4(textOutput("month")),
+                  h4(textOutput("gearname")),
+                
+                  htmlOutput("dataBeingUsed"), #replaces a textOutput so I can style color based on value
+                #ui side for loading initial .csv's
+                div(id = "loading-content",
+                    h1("Uploading Data..."),
+                    style="color:red"),
+                hr(),
+                h4(helpText("Minimum of Lake, Year, and Gear inputs must be selected. Multiple selections are allowed
+                           within each field.")),
+                h4(helpText("Filtered dataset will appear below.")),
+                hr(),
+                textOutput("currentDataID"),
+                actionButton("change","Change the data being used"),
+                hr(),
+                downloadButton("downloadData", "Download Selected Sample Data")
+              ), 
+             
             )
           ),
-         
-        #Data selection summary - renderText to show full names of lakes, gears, species
-         column(4, align = "center",
-          mainPanel(width = 12, 
-            wellPanel(        
-              h4("Sample Selection Summary"),
-              hr(),
-                h4(textOutput("lakename")),
-                h4(textOutput("year")),
-                h4(textOutput("month")),
-                h4(textOutput("gearname")),
-                span(textOutput("useUploadedsamp"), style="color:green"),
-              #ui side for loading initial .csv's
-              div(id = "loading-content",
-                  h1("Uploading Data..."),
-                  style="color:red"),
-              hr(),
-              h4(helpText("Minimum of Lake, Year, and Gear inputs must be selected. Multiple selections are allowed
-                         within each field.")),
-              h4(helpText("Filtered dataset will appear below.")),
-              hr(),
-              downloadButton("downloadData", "Download Selected Sample Data")
-            ), 
-            wellPanel(
-              h4("Alternatively, upload your own sample data"),
-              helpText("Must have correct .csv format and column headings"),
-              fileInput("loadedData", "Upload Sample Data"),
-              checkboxInput("loadCheck", "Check to use uploaded sample data", value = FALSE)
-            )
-          )
         ),
-         column(4,
-          sidebarPanel(width = 12,
-            h4("Filter Dataset by Names", align="center"),
-            hr(),
-            #choices for below selectize boxes are processed in server.r
-            # selectizeInput(
-            #   "selectlakename", "Lake Name(s):", choices = sort.default(lakeinfo$Lake.Name),   
-            #   multiple = TRUE, options = list(placeholder = "click/type here")
-            # ),
-            selectizeInput(
-              "selectlakename", "Lake Name(s):", choices = NULL,   
-              multiple = TRUE, options = list(placeholder = "click/type here")
-            ),
-            # selectizeInput(
-            #   "selectyearname", "Year(s):", choices = yearmonthinfo$Year,
-            #   multiple = TRUE, options = list(placeholder = "click/type here")
-            # ),
-            selectizeInput(
-              "selectyearname", "Year(s):", choices = NULL,
-              multiple = TRUE, options = list(placeholder = "click/type here")
-            ),
-            # selectizeInput(
-            #   "selectmonthname", "Month(s):", choices = yearmonthinfo$Month,
-            #   multiple = TRUE, options = list(placeholder = "click/type here")
-            # ),
-            selectizeInput(
-              "selectmonthname", "Month(s):", choices = NULL,
-              multiple = TRUE, options = list(placeholder = "click/type here")
-            ),
-            # selectizeInput(
-            #   "selectgearname", "Gear Name(s):", choices = sort.default(gearinfo$Gear.Name),
-            #   multiple = TRUE, options = list(placeholder = "click/type here")
-            # )
-            selectizeInput(
-              "selectgearname", "Gear Name(s):", choices = NULL,
-              multiple = TRUE, options = list(placeholder = "click/type here")
-            )
-          )
-         )
-        ),
+      
         #code with output from widgets showing data to be analyzed
         hr(),
         fluidRow(
           textOutput("printGear"),
           DT::dataTableOutput("selectedDataTable")
           )
-      ),
+    ),
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Select Analyses Tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Select Analyses Tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       tabPanel("Select Analyses",
               hr(),  
               sidebarPanel(width=12,
@@ -212,17 +151,19 @@ fluidPage(
                     )
                   ),
                   
-                  #Single Species Analyses Selection column
+                  #Single-Species Analyses Selection column
                   column(4,
                     wellPanel(
-                      h4("Single Species Analyses Selection", align="center"),
+                      h4("Single-Species Analyses Selection", align="center"),
                       hr(),
-                          selectizeInput("selectspecies", "Select Species Code:", choices = NULL,
-                              multiple = TRUE, options = list(placeholder = "click/type here")),
-                          selectizeInput("selectspeciesname", "Select Species Name:", choices = NULL,
-                              multiple = TRUE, options = list(placeholder = "click/type here")),
-                          helpText("Species must be selected for Single Species Analysis Output"),
-                        downloadButton("downloadsppData", "Download Selected Species Data"),
+                          
+                          checkboxInput("toggleSppCodeName", 
+                                "Check box to filter by code-name, uncheck to filter by name", value = FALSE),
+                          selectizeInput("selectspecies", "Select Species from Sampling Data to Analyze:", choices = NULL,
+                              multiple = T, options = list(placeholder = "click/type here")),
+                          helpText("Species above must be selected for Single-Species Analysis and will dictate the
+                                   species used in the sampling data"),
+                        downloadButton("downloadsppData", "Download Selected Species Sampling Data"),
                       hr(),
                       h4("Select Age Dataset"),
                       hr(),
@@ -233,17 +174,19 @@ fluidPage(
                         span(textOutput("useUploadedage"), style="color:green"),
                         h4(textOutput("agecount")),
                         hr(),
-                          selectizeInput("selagespp", "Select Species Code:", choices = NULL,
+
+                      
+                          selectizeInput("selagespp", "Select Species from age data below to pair with the  
+                                         species selected above from the sampling data for analysis:", choices = NULL,
                                multiple = TRUE, options = list(placeholder = "click/type here")),
-                          # uiOutput("selagelake"),
-                          selectizeInput("selagelake", "Select Lake Code(s):", choices = NULL,
+                          selectizeInput("selagelake", "Select Lake Code(s) to pick age data for analysis:", choices = NULL,
                                multiple = TRUE, options = list(placeholder = "click/type here")),
-                          # uiOutput("selageyears"),
-                          selectizeInput("selageyears", "Select Year(s):", choices = NULL,
+                          selectizeInput("selageyears", "Select Year(s) to pick age data for analysis:", choices = NULL,
                               multiple = TRUE, options = list(placeholder = "click/type here")),
-                          helpText("All three selection boxes are required to select age dataset."),
+                          helpText("All three selection boxes are required to select age dataset and are
+                                   selected hierarchiaclly (species, then lake, then year."),
                           helpText("Multiple selections are allowed in Lake and Year fields."),
-                          helpText("Age dataset will appear below."),
+                          helpText("Age dataset will appear below once all three boxes are populated."),
                         downloadButton("downagedata", "Download Selected Age Data")
                     )
                    ),
@@ -251,7 +194,7 @@ fluidPage(
                   #Single Species Analyses Metrics checkbox column
                    column(4,
                     wellPanel(
-                      h4("Single Species Analyses Metrics", align="center"),
+                      h4("Single-Species Analyses Metrics", align="center"),
                         hr(),
                         h4("Length and Weight Metrics"),
                         hr(),
@@ -282,9 +225,9 @@ fluidPage(
               DT::dataTableOutput("selectedageData")
         ),            
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Catch Analysis Output Tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%             
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Catch Analysis Output Tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%             
       tabPanel("Catch Analyses",
             hr(),
               mainPanel(width=12,
@@ -345,10 +288,10 @@ fluidPage(
       
      ),            
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Single Species Analysis Output##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     tabPanel("Single Species Analyses", value="analyze",
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Single-Species Analysis Output##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+     tabPanel("Single-Species Analyses", value="analyze",
        hr(),       
         mainPanel(width=12, 
           fluidRow(     
@@ -371,7 +314,7 @@ fluidPage(
                                  max = 200, width = '180px'),
                     helpText("Enter desired length bin grouping: default is 10 mm."),
                     helpText("Enter 25.4 mm for 1-inch groupings"),
-                  hr(),
+                  br(),
                   downloadButton("downlfplot","Length-Frequency Plot"),
                   downloadButton("downlftable", "Length-Frequency Tabular Data"),
                   hr(),
@@ -381,6 +324,8 @@ fluidPage(
                     helpText("References of lengths for PSD size categories"),
                     tableOutput("psdvaltable"),
                     tableOutput("psdtable"),
+                    downloadButton("downpsd", "PSD Table"),
+                br(),
                   hr(),
                     h4("Relative Weight (Wr)"),
                   hr(),
@@ -388,19 +333,21 @@ fluidPage(
                     tableOutput("standardequation"),
                   hr(),
                     tableOutput("wrtable"),
+                    downloadButton("downwr", "Relative Weight Table"),
+                  br(),
                   hr(),
                     h4("Length-Weight Regression"),
                     plotOutput("lwplot"),
+                    downloadButton("downLWregplot","Length-Weight Regression Plot"),
+                  br(),
+                  br(),
                     tableOutput("lwcoef"),
                   hr(),
                     h4("Max Length and Weight"),
                   hr(),
                     tableOutput("maxspptab"),
-                  hr(),
-                  h4("Length-Weight Downloads"),
-                    downloadButton("downpsd", "PSD Table"),
-                    downloadButton("downwr", "Relative Weight Table"),
-                    downloadButton("downLWregplot","Length-Weight Regression Plot")
+                  # hr(),
+                  # h4("Length-Weight Downloads"),
               )
             ),
             
@@ -411,53 +358,95 @@ fluidPage(
                   hr(),
                     h4("Selected Age-Length Key"),
                     plotOutput("alkplot"),
+                    # downloadablePlotUI("alkplot2", downloadtypes = c("png")),
                   hr(),
                     downloadButton("obsALK","Observed Age-Length Key"),
                     downloadButton("smoothALK","Smooth Age-Length Key"),
                     downloadButton("downALKplot","Age-Length Key Plot"),
+                    downloadButton("agedfishtable", "Table with ages assigned to fish"),
                   hr(),
                     h4("Age Frequency Histogram"),
                     plotOutput("agefreqhist"),
-                  hr(),
+                    downloadButton("downafplot","Age-Frequency Plot"),
+                  # renderUI("lineBrk"),
+                  br(),
+                  br(),
+                  br(),
                     h4("Growth Metrics"),
                     helpText("Mean Length-at-Age and von Bertalanffy Growth Equation"),
-                  hr(),
                     h4(checkboxInput("inch", "Display Measurements in English Units (in & lbs)", value = FALSE)),
                     helpText("Default is metric (mm and g). Checkbox changes units to in. and lbs."),
                     plotOutput("meanlengthplot"),
+                    downloadButton("downmeanplot","von Bertalanffy plot"),
+                  br(),
+                  br(),
+                  br(),
                     helpText("Mean Length-at-Age"),
                     tableOutput("meanlengthtable"),
+                    downloadButton("downML", "Mean Length-at-Age Table"),
+                  br(),
+                  br(),
+                  br(),
                     helpText("Mean Weight-at-Age"),
                     tableOutput("meanweighttable"),
+                    downloadButton("downMW", "Mean Weight-at-Age Table"),
+                  br(),
+                  br(),
+                  br(),
                     helpText("von Bertalanffy Growth Equation"),
                     tableOutput("vonBcoef"),
-                  hr(),
+                    downloadButton("downvonBcoef", "von Bert Equation Table"),
+                  br(),
+                  br(),
+                  br(),
                     h4("Catch Curve (Mortality)"),
                     plotOutput("catchcurve"),
-                    tableOutput("mortalitytable"),
-                  hr(),
-                  h4("Population Dynamics Downloads"),
-                    downloadButton("downafplot","Age-Frequency Plot"),
-                    downloadButton("downmeanplot","Growth Metrics Plot"),
-                    downloadButton("downML", "Mean Length-at-Age Table"),
-                    downloadButton("downMW", "Mean Weight-at-Age Table"),
-                    downloadButton("downvonBcoef", "von Bert Equation Table"),
                     downloadButton("downmort", "Catch Curve Plot"),
-                    downloadButton("downmorttable", "Mortality Table")
+                  br(),
+                  br(),
+                  br(),
+                    tableOutput("mortalitytable"),
+                    downloadButton("downmorttable", "Mortality Table"),
+                  br(),
+                  br(),
+                  br(),
+                textOutput("TheorMaxAge"),
+                textOutput("ObsMaxAge"),
+                
+                  hr(),
+                    h4("Estimates of natural mortality (and resulting fishing mortality)"),
+                    helpText("Estimates of natural mortality (M) are based on the fact that M often correlates with theoretical 
+                             max age (Hoenig NLS approach) or von Bertalanffy values (Pauly NLS-T approach).  Fishing
+                             mortality is then calculated as total mortality minus natural mortality. The Hoenig NLS method should 
+                             be preferred when available as it produces the most consistently accurate results (Then et al. 
+                             2015), but Pauly NLS-T can be used in cases where theoretical maximum age cannot be calcualted 
+                             but von Bertalanffy curve parameters are available.  If fishing mortality is negative, it is 
+                             a sign that the estimated natural mortality was already larger than total mortality...suggesting 
+                             the estimated natural mort was not a good fit to these data (and/or that most mortality is 
+                             caused by natural mortality)."),
+                    tableOutput("natMortalityTable"),
+                    helpText(""),
+                
+                  # hr(),
+                  # h4("Population Dynamics Downloads"),
+                downloadButton("downNatmorttable", "Est Nat Mortality Table")
+                  
                     
               )
             )
           )
         )
       ),
-     
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Percentiles tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Percentiles tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       tabPanel("Statewide Percentiles", 
+               
          hr(),
          mainPanel(width=12,
            fluidRow(
+   
              #parameter selection column on left
              column(4,
                 #sidebarPanel(width = 12,
@@ -468,30 +457,17 @@ fluidPage(
                      ###selectize boxes for parameterizing percentile calculations
                      
                       #gear code, choices on server.r
-                        div(style="display:inline-block",
-                            selectizeInput("selPercGear", "Gear Code(s):", choices = NULL,
+                        div(#style="display:inline-block",
+                            selectizeInput("selPercGear", "Select Gear:", choices = NULL,
                                  multiple = TRUE, options = list(placeholder = "click/type here"))
                           ),
                    
-                      #gear name, choices on server.r
-                        div(style="display:inline-block",
-                            selectizeInput("selPercGearNm", "Gear Name(s):", choices = NULL, 
-                                 multiple = TRUE, options = list(placeholder = "click/type here"))
-                          ),
-      
-                      uiOutput("lineBrk"), #create hard return
-      
                       #select Species code, choices processed on server.r
-                        div(style="display:inline-block",#uiOutput("selSppPerc")), 
-                            selectizeInput("selPercSpp", "Species Code(s):", choices = NULL,
+                        div( 
+                            selectizeInput("selPercSpp", "Select Species:", choices = NULL,
                                   multiple = TRUE, options = list(placeholder = "click/type here"))
                           ),
                 
-                      #select species name, choices processed on server.r
-                        div(style="display:inline-block",selectizeInput("selPercSppNm", "Species Name(s):", width = "100%",
-                            choices = NULL,multiple = TRUE, options = list(placeholder ="click/type here"))
-                          ),  
-                  
                       #Year slider
                        sliderInput("perYrs", "Year Range", min = 1980,
                            max = as.numeric(format(Sys.Date(), "%Y")), sep = "", step=1,
@@ -502,16 +478,11 @@ fluidPage(
                             multiple = TRUE, options=list(placeholder = "click/type here")),
       
                       #Lake code, choices processed on server.r
-                         div(style="display:inline-block",
-                             selectizeInput("selLakeCodePerc", "Lake Code(s):", choices = NULL, multiple = TRUE, 
+                         div(#style="display:inline-block",
+                             selectizeInput("selLakeCodePerc", "Select Lake(s)", choices = NULL, multiple = TRUE,
                                 options = list(placeholder = "click/type here"))
                             ),
                      
-                       #Lake name, choices processed on server.r
-                         div(style="display:inline-block",
-                             selectizeInput("selLakeNamePerc", "Lake Name(s):", choices = NULL,multiple =
-                                  TRUE, options = list(placeholder = "click/type here"))
-                            ),
                      helpText("All codes can be referenced in the SSP Manual tab."),
                   ),
                   
@@ -545,16 +516,14 @@ fluidPage(
                                 ")),
                           div(id = "reverseSlider",
                               uiOutput("min_survey")
-                              # sliderInput(inputId = "N_SurveyMin", label = 
-                              #   "Min # of surveys for which to calculate percentiles", 
-                              #   min = 3, max = 100, sep = "", step=1, value = 10)
                            ),
                             #note: selPerctls() has list of percentiles to use
                      
                       #Slider for min # stock size fish before calculate PSD
                           div(id = "reverseSlider",
                               sliderInput(inputId = "N_PSDMin", label = 
-                                "Min # of stock-size fish required before including a survey's PSD value percentile calculation", 
+                                "Min # of stock-size fish required before including a survey's PSD value percentile calculation
+                                (only effects PSD percentile table)", 
                                 min = 10, max = 100, sep = "", step=1, value = 40)
                                 #95% CI's are +/- 25 PSD units with N=25 stock fish...so default to no smaller than 25 on this.
                                 #with N=40, CI is +/- 19...probably more realistic for default table with 5 percentiles.
@@ -564,7 +533,8 @@ fluidPage(
                       #Slider for min # Wr values for Wr percentiles
                           div(id = "reverseSlider",
                               sliderInput(inputId = "Min_Wr_N", label = 
-                                       "Min # of Wr values required before including survey's average Wr in percentile calculation", 
+                                       "Min # of Wr values required before including survey's average Wr in percentile calculation 
+                                       (only effects Wr percentile table)", 
                                      min = 3, max = 100, sep = "", step=1, value = 5)
                           ),
                      
@@ -601,64 +571,68 @@ fluidPage(
                     wellPanel(
                         span(textOutput("Max_TL_Wt_Text"),style="font-size:175%"),
                         tableOutput("Max_TL_Wt_perc"),
-                        h4(checkboxInput("Max_TL_WT_inch_lb", "Display Measurements in English Units (in & lbs)", value = FALSE)),
-                        helpText("Default is metric (mm and g). Checkbox changes units to inches and lbs.")
-                        
+                          fluidRow(
+                            column(5,
+                              h4(uiOutput("MaxTlWtUnits"))),#render check box for changing units
+                            column(1,
+                              uiOutput("Max_TL_Wt_percRendered")), #Download button
+                            ),
+                          uiOutput("MaxTlWtHelpText") #render message about changing units
                     ),
                     wellPanel(
                       span(textOutput("CPUEpercText"),style="font-size:175%"),
-                      tableOutput("CPUEperc")
+                      tableOutput("CPUEperc"),
+                      uiOutput("CPUEpercRendered") #render download button
                     ),
                     wellPanel(
                       span(textOutput("PSDpercText"),style="font-size:175%"),
-                      tableOutput("PSDperc")
+                      tableOutput("PSDperc"),
+                      uiOutput("PSDpercRendered")#render download button
                     ),
                     wellPanel(
                       span(textOutput("WrpercText"),style="font-size:175%"),
-                      tableOutput("Wrperc")
+                      tableOutput("Wrperc"),
+                      uiOutput("WrpercRendered")#render download button
                     ),
                     wellPanel(
                       span(textOutput("MLApercText"),style="font-size:175%"),
                       tableOutput("MLAperc"),
-                      h4(checkboxInput("MLA_inch", "Display Measurements in English Units (inches)", value = FALSE)),
-                      helpText("Default is metric (mm). Checkbox changes units to inches.")
-                      
+                      fluidRow(
+                        column(5,
+                                uiOutput("MLA_Units")),#render check box for changing units
+                        column(1,
+                               uiOutput("MLApercRendered")),#render download button
+                      ),
+                      uiOutput("MLAhelpText") #render message about changing units
                     ),
                     wellPanel(
                       span(textOutput("MWtApercText"),style="font-size:175%"),
                       tableOutput("MWtAperc"),
-                      h4(checkboxInput("MWtA_lb", "Display Measurements in English Units (pounds)", value = FALSE)),
-                      helpText("Default is metric (g). Checkbox changes units to pounds.")
+                      fluidRow(
+                        column(5,
+                               uiOutput("MWtA_Units")),#render check box for changing units
+                        column(1,
+                               uiOutput("MWtApercRendered")),#render download button
+                      ),
+                      uiOutput("MWtAhelpText") #render message about changing units
                     ),
                   
                     wellPanel(
                       span(textOutput("MortpercText"),style="font-size:175%"),
-                      tableOutput("Mortperc")
+                      tableOutput("Mortperc"),
+                      uiOutput("MortrpercRendered")#render download button
                     )
                 ),
-                      
-                      #stuff to delete after done debugging
-                      
-                      # h3("testing raw data"),
-                      # hr(),
-                      # DT::dataTableOutput("selPercDataTbl"),
-                      #   #tableOutput("selPercDataTbl")
-                      
-                      # h3("testing age data"),
-                      # DT::dataTableOutput("selPercAgedTbl")
-                      # 
-                      # h3("testing sortAge table"),
-                      # DT::dataTableOutput("test"),
-                      
               )
            )
          ),
-         
+              #use below line to display selected percentile data table at bottom of page
+              # DT::dataTableOutput("selectedPercTable")
       ),
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Stocking info tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Stocking info tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       tabPanel("Stocking Information",
            hr(),
            mainPanel(width=12,
@@ -675,7 +649,7 @@ fluidPage(
                    hr(),
                    h3("Stocking Information Criteria"),
                    hr(),
-                   sliderInput("stockrange", "Year Range", min = 1931,
+                   sliderInput("stockrange", "Year Range", min = min(stockingData$Year, na.rm = FALSE), step = 1,
                                max = max(stockingData$Year, na.rm = FALSE), sep = "",
                                value = c(max(stockingData$Year, na.rm = TRUE)-10,
                                          max(stockingData$Year, na.rm = TRUE))),
@@ -697,16 +671,17 @@ fluidPage(
                  wellPanel(
                    h3("Stocking Information Table"),
                    hr(),
-                    tableOutput("stocktable")
+                    # tableOutput("stocktable")
+                   DT::dataTableOutput("stocktable")
                  )
                )
              )
            )
       ), 
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##User's guide tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##User's guide tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
        tabPanel("User's Guide",
             hr(),
             mainPanel(width=12,
@@ -720,9 +695,9 @@ fluidPage(
             )
        ),
      
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##SSP Manual tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##SSP Manual tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
        tabPanel("SSP Manual",
           hr(),
           mainPanel(width=12,
@@ -735,10 +710,10 @@ fluidPage(
             )        
           )
        ),
-     
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     ##Acknowledgements tab##########
-     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##Acknowledgements tab##########
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       tabPanel("Acknowledgements",
           hr(),
           mainPanel(width=12,
@@ -760,7 +735,10 @@ fluidPage(
                    h4("Josh Johnston"),
                    h4("Jason Schooley"),
                    h4("Cliff Sager"),
-                   h4("Garrett Johnson")
+                   h4("Garrett Johnson"),
+                   h4("Ashley Nealis"),
+                   h4("Michael Holley"),
+                   h4("Jeremy Duck")
                 )
               ),
               
@@ -770,34 +748,41 @@ fluidPage(
                   h3("R Packages Used:"),
                   hr(),
                    h4("FSA"),
-                   h5("Ogle, D.H. 2017. FSA: Fisheries Stock Analysis. R package version 0.8.17."),
+                   h5("Ogle, D.H., J.C. Doll, P. Wheeler, and A. Dinno. (2022). FSA: Fisheries Stock Analysis. 
+                      R package version 0.9.3"),
                    helpText("When using output derived from this app, please cite the above
                             FSA Package. Almost every metric used a function from this package."),
                    h4("shiny"),
-                   h5("Winston Chang, Joe Cheng, JJ Allaire, Yihui Xie and Jonathan McPherson (2017). shiny: Web
-                     Application Framework for R. R package version 1.0.5."),
+                   h5("Winston Chang, Joe Cheng, JJ Allaire, Carson Sievert, Barret Schloerke, Yihui Xie, Jeff Allen, 
+                      Jonathan McPherson, Alan Dipert and Barbara Borges (2021). shiny: Web Application Framework for 
+                      R. R package version 1.7.1."),
                    h4("shinyjs"),
-                   h5("Dean Attali (2017). shinyjs: Easily Improve the User Experience of Your Shiny Apps in Seconds.
-                     R package version 0.9.1."),
-                   h4("V8"),
-                   h5("Jeroen Ooms (2017). V8: Embedded JavaScript Engine for R. R package version 1.5."),
+                   h5("Dean Attali (2021). shinyjs: Easily Improve the User Experience of Your Shiny Apps in Seconds. 
+                      R package version 2.1.0."),
                    h4("dplyr"),
-                   h5("Hadley Wickham, Romain Francois, Lionel Henry and Kirill Muller (2018). dplyr: A Grammar of Data
-                      Manipulation. R package version 0.7.5."),
-                   h4("plyr"),
-                   h5("Hadley Wickham (2011). The Split-Apply-Combine Strategy for Data Analysis. Journal of
-                     Statistical Software, 40(1), 1-29."),
+                   h5("Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2022). dplyr: A Grammar of Data Manipulation. 
+                      R version 1.0.9."),
                    h4("tidyr"),
-                   h5("Hadley Wickham and Lionel Henry (2017). tidyr: Easily Tidy Data with 'spread()' and 'gather()'
-                     Functions. R package version 0.7.2."),
+                   h5("Hadley Wickham and Maximilian Girlich (2022). tidyr: Tidy Messy Data. R package version 1.2.0."),
                    h4("nnet"),
-                   h5(" Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition.
+                   h5("Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition.
                     Springer, New York. ISBN 0-387-95457-0"),
                    h4("nlstools"),
                    h5("Florent Baty, Christian Ritz, Sandrine Charles, Martin Brutsche, Jean-Pierre Flandrois,
                     Marie-Laure Delignette-Muller (2015). A Toolbox for Nonlinear Regression in R: The Package
-                    nlstools. Journal of Statistical Software, 66(5), 1-21.")
-
+                    nlstools. Journal of Statistical Software, 66(5), 1-21."),
+                  h4("DT"),
+                  h5("Yihui Xie, Joe Cheng and Xianying Tan (2022). DT: A Wrapper of the JavaScript Library 'DataTables'. 
+                     R package version 0.23."),
+                  h4("data.table"),
+                  h5("Matt Dowle and Arun Srinivasan (2021). data.table: Extension of `data.frame`. R package version 1.14.2."),
+                  h4("tibble"),
+                  h5("Kirill Müller and Hadley Wickham (2021). tibble: Simple Data Frames. R package version 3.1.7."),
+                  h4("rlang"),
+                  h5("Lionel Henry and Hadley Wickham (2022). rlang: Functions for Base Types and Core R and 'Tidyverse' 
+                     Features. R package version 1.0.2."),
+                  h4("fst"),
+                  h5("Mark Klik (2022). fst: Lightning Fast Serialization of Data Frames. R package version 0.9.8."),
                  )
                )
             )
@@ -805,6 +790,3 @@ fluidPage(
       )
    )
 )   
-    ############
-   
-  

@@ -3,3 +3,6 @@
 .RData
 .Ruserdata
 Temp_scratch_directory/*
+rsconnect/*
+Old_stuff/*
+
