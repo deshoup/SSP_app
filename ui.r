@@ -30,11 +30,18 @@ fluidPage(
           
           
    # profvis_ui("profiler"), adds button to start profiling for debugging and speed measurement
-        column(3,align="center", img(src="ODWClogo.gif", height="auto", width="150px")),
+        column(3,align="center", img(src="ODWClogo.gif", height="auto", width="100px")),
         column(6, align="center", h2("Oklahoma Fishery Analysis Application"),
                hr(), 
                h5("Created by Dray D. Carl and Daniel E. Shoup")),
-        column(3, align="center",img(src="osulogo.png", height="auto", width="180px"))
+              #below line vertically centers OSU logo...sets height to 110 px
+               tags$style(HTML('
+                      .verticalcenter {
+                      display: table-cell;                      
+                      height: 110px;
+                      vertical-align: middle;
+                      }')),
+        column(3, align="center", img(src="osulogo.png", height="auto", width="auto",class="verticalcenter"))
         )
     ),
     windowTitle = "OK Fishery Analysis App" #this text is what appears as browser title
@@ -359,6 +366,8 @@ fluidPage(
                     h4("Selected Age-Length Key"),
                     plotOutput("alkplot"),
                     # downloadablePlotUI("alkplot2", downloadtypes = c("png")),
+                    h4(checkboxInput("extrapAge", "extrapolate age-length key to smaller fish than smallest individual aged.",
+                                     value = T)),
                   hr(),
                     downloadButton("obsALK","Observed Age-Length Key"),
                     downloadButton("smoothALK","Smooth Age-Length Key"),

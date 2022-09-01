@@ -104,9 +104,10 @@ showModal(pick_Database) #activate above modal
     #create mainData$df_value as container to hold data that user will select with modal dialog
     mainData <- reactiveValues(df_data = NULL)
 
-    #if user uploads data, automatically check the "load your own data" box. 
+    #if user uploads a file, automatically check the "load your own data" box. 
     observeEvent(input$loadedSampleData, {
-      if(!is.na(input$loadedSampleData)){
+      # if(!is.na(input$loadedSampleData)){ 
+      if(!is_empty(input$loadedSampleData)){ 
         updateCheckboxGroupInput(session, "selectedData", selected = "loadedSampleData")
       }
     })
@@ -131,18 +132,30 @@ showModal(pick_Database) #activate above modal
          }else{
          mainDataRead <- as.data.table(fread(input$loadedSampleData$datapath))
             mainDataRead[mainDataRead == "."] <- NA
+            #deal with Verified.?? columns if they exist
+            if("Verified.TL.Wr" %in% colnames(mainDataRead)){
+              mainDataRead <- mainDataRead %>% select(-Verified.TL.Wr)
+            } #need to keep above as had app deployed a while with this combined
+            if("Verified.TL" %in% colnames(mainDataRead)){
+              mainDataRead <- mainDataRead %>% select(-Verified.TL)
+            }
+            if("Verified.Wr" %in% colnames(mainDataRead)){
+              mainDataRead <- mainDataRead %>% select(-Verified.Wr)
+            }
             mainDataRead <- mutate(mainDataRead, TL_mm = as.numeric(as.character(TL_mm)),
-                              Wt_g = as.numeric(as.character(Wt_g))) %>% 
+                              Wt_g = as.numeric(as.character(Wt_g))) %>%
                 merge(select(lakeinfo, Lake.Code, Lake.Name), by="Lake.Code", all.x = TRUE) %>%
                 merge(select(gearinfo, Gear.Code, Gear.Name), by="Gear.Code", all.x = TRUE) %>%
                 unite(Lake.Name, Lake.Code, col="lake.Name_Code", sep = " - ", remove = F) %>%
                 unite(Gear.Name, Gear.Code, col="gear.Name_Code", sep = " - Code ", remove = F) %>%
                 merge(select(speciesinfo, Species.Code, Species.Name, species.Code_Name), by="Species.Code", all.x=TRUE) %>% 
-                relocate(lake.Name_Code, gear.Name_Code, species.Code_Name, .after = last_col()) %>% 
+                relocate(Lake.Code, SampleID, Station, Month, Day, Year, Time, Pool.Elevation, Surface.Temp, Secchi, Conductivity, 
+                         Gear.Code, Gear.Name, Gear.Length, Habitat, Effort, Species.Code, Species.Name, Number.of.individuals, 
+                         TL_mm, Wt_g, Lake.Name, lake.Name_Code, gear.Name_Code, species.Code_Name, .after = last_col()) %>% 
                 setkey(Lake.Code, Year, Gear.Code, Month)
-            output$dataBeingUsed <- renderText({
-              return(paste("<span style=\"color:green\">Using uploaded sample data</span>"))
-            })
+            # output$dataBeingUsed <- renderText({
+            #   return(paste("<span style=\"color:green\">Using uploaded sample data</span>"))
+            # })
            mainData$df_data <- mainDataRead
            setkey(mainData$df_data, Lake.Code, Year, Gear.Code, Month)
            removeModal()
@@ -695,15 +708,16 @@ showModal(pick_Database) #activate above modal
   
     #Create table from selData/SSP data (i.e., catch data rather than age data) for single species analysis 
       selDataspp <- reactive({
-        if(input$toggleSppCodeName==TRUE){
-          selDataspp <- selData()[selData()$Species.Name == input$selectspecies,]
+        req(selData(), input$selectspecies)
+          if(input$toggleSppCodeName==TRUE){
+            selDataspp <- selData()[selData()$Species.Name == input$selectspecies,]
+              selDataspp <- selDataspp[rep(seq_len(nrow(selDataspp)), selDataspp$Number.of.individuals),]
+                #Above line repeats each row by number of times in Number of individuals column
+          }else{
+            selDataspp <- selData()[selData()$species.Code_Name == input$selectspecies,]
             selDataspp <- selDataspp[rep(seq_len(nrow(selDataspp)), selDataspp$Number.of.individuals),]
-              #Above line repeats each row by number of times in Number of individuals column
-        }else{
-          selDataspp <- selData()[selData()$species.Code_Name == input$selectspecies,]
-          selDataspp <- selDataspp[rep(seq_len(nrow(selDataspp)), selDataspp$Number.of.individuals),]
-          #Above line repeats each row by number of times in Number of individuals column
-        }
+            #Above line repeats each row by number of times in Number of individuals column
+          }
       })
       
     # Create downloadable csv of selected selData/SSP species dataset
@@ -1319,7 +1333,12 @@ showModal(pick_Database) #activate above modal
         psdvals <- as.data.table(psdVal(gabelname()))
         #calculate psd's from FSA function
         psdCalc <- psdCalc(~TL_mm, gabelseldata(), gabelname(), units="mm", 
-                           method="multinomial", what="all", showIntermediate = FALSE)
+                           method="multinomial", what="all", showIntermediate = FALSE) 
+        #rename PSD-Q as just PSD
+          psdCalc <-  rownames_to_column(as.data.frame(psdCalc), var="rownames")  
+          psdCalc <- mutate(psdCalc, rownames =case_when(rownames == "PSD-Q" ~ "PSD", TRUE ~ rownames))
+          psdCalc <- column_to_rownames(psdCalc, var = "rownames")
+        
         colnames(psdCalc)[1:3] <- c("PSD Value", "L 95% CI", "U 95% CI")
         psdfinal <- as.data.frame(psdCalc)
       }
@@ -1549,7 +1568,8 @@ showModal(pick_Database) #activate above modal
       #run multiple logistic regression
         mlr <- multinom(Age~LCat, data = agedlencat, maxit=500)
       #find min and max length category for sequence (rownames)
-        minlencatage <- min(agedlencat$LCat)
+        # minlencatage <- min(agedlencat$LCat)
+        minlencatage <- 10
         maxlencatage <- max(agedlencat$LCat)
         lens <- seq(minlencatage,maxlencatage,w)
       #Make predictions with mlr
@@ -1557,6 +1577,15 @@ showModal(pick_Database) #activate above modal
         row.names(alkmlr1) <- lens
         alkmlr <- alkmlr1
     })
+        ##could add switch/button that ages all fish smaller than those in aged data as age-0 to allow field data
+        ##to include fish smaller than were kept for age analysis.  To do this, I cannot just make minlencatage smaller.
+        ##I think I would need to actually rbind rows for missing length classes and set age=0 in selageDatafinal(). 
+        ##Could do this with code that takes min(agedlencat$LCat) and subtracts 10 from it itteratively until the value
+        ##is <= 10...adding a column for age and setting it to 0 for each one.  Should have check to see if the smallest
+        ##age class was 100% age 0 as this should not be applied otherwise. This would make N reported at top of page for
+        ##the aged data sample incorrect unless I did somethign special (maybe use agedlencat dataframe rather than 
+        ##selageDatafinal to do this?)  I will not do this for now, but if it comes up wanted this note to save my
+        ##thought process.
     
     ###Create dataset with predicted ages for the sample data (fields c(TL_mm, LCat, Age))##########
     
@@ -1577,7 +1606,14 @@ showModal(pick_Database) #activate above modal
         sampledata <- samplencat[c("TL_mm", "LCat", "Wt_g", "Age", "Number.of.individuals")]
       #find min and max length categories within MLR ALK
         agedlencat2 <- lencat(~TLmm, w=w, startcat = 0, right = FALSE, data = selageDatafinal())
-        minlencatage2 <- min(agedlencat2$LCat)
+        if(input$extrapAge == FALSE){
+            minlencatage2 <- min(agedlencat2$LCat)
+        }else{
+          #below allows us to use smallest fish observed, whether from age or sample data. Shoul not produce
+          #any issues because multinomial regression will assume pattern follows for smaller fish, but probably should
+          #not be done if there are huge descrepancies between smallest aged fish and smallest field sampled fish.
+        minlencatage2 <- min(min(agedlencat2$LCat), min(sampledata$LCat))
+        }
         maxlencatage2 <- max(agedlencat2$LCat)
       #filter sample dataset to exclude any fish out of bounds of MLR age length key, also if length=NA
         sampledata2 <- filter(sampledata, LCat>(minlencatage2-1), LCat<(maxlencatage2+1), !is.na(LCat))
@@ -1592,7 +1628,7 @@ showModal(pick_Database) #activate above modal
       output$agedfishtable <- downloadHandler(
         filename = function() {
           paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
-                "agedFishTable", "csv", sep = "_")
+                "agedFishTable", "csv", sep = ".")
         },
         content = function(file) {
           write.csv(agesample(), file, row.names = TRUE)
@@ -2133,6 +2169,7 @@ showModal(pick_Database) #activate above modal
         
   #Function to convert gear.Name_Code to Gear.Code
   gearNameCode_toCode <- reactive({
+    req(input$selPercGear)
          gear <- data.table(input$selPercGear)
           colnames(gear) <- "gear.Name_Code"
           gear <- merge(gear, gearinfo, by="gear.Name_Code", all.x=T)
@@ -2156,6 +2193,7 @@ showModal(pick_Database) #activate above modal
   #used to determine if multiple selected gears are from the same gear family (will be allowed for PSD and mort, but not CPUE
   #percentile tables)
   gearFamilies <- reactive({
+    req(gearNameCode_toCode())
     gearCodesUsed <- data.table(unique(gearNameCode_toCode()))
     colnames(gearCodesUsed) <- "Gear.Code" 
     gearCodesUsed2 <- merge(gearCodesUsed, gearinfo, by="Gear.Code")
@@ -2326,7 +2364,7 @@ showModal(pick_Database) #activate above modal
         relocate(N_Surveys, .after = last_col()) %>% ungroup() %>%
         select(-sortOrder, -CPUEmetric, -Species.Code) %>%
         relocate(cat_title, .after = Species.Name) %>%
-        rename("Species Name" = "Species.Name", "CPUE Category" = "cat_title", "# Surveys" = "N_Surveys")
+        rename("Species Name" = "Species.Name", "CPUE Category" = "cat_title", "# Surveys" = "N_Surveys") 
     })
 
     #PSD percentile calculations
@@ -2577,7 +2615,7 @@ showModal(pick_Database) #activate above modal
         req(CPUEpercTable())
         if(!is.null(input$selPercGear)){
           if(length(input$selPercGear) == 1){
-            if(rowSums(is.na(CPUEpercTable()[1,])) < ncol(CPUEpercTable())){#only show if first row does not have NA in all columns 
+            if(rowSums(is.na(CPUEpercTable()[1,])) < ncol(CPUEpercTable())){#only show if first row does not have NA in all columns
               CPUEpercTable()
             }
           }
@@ -2624,6 +2662,7 @@ showModal(pick_Database) #activate above modal
       })
       
       output$PSDpercText <- renderText({
+        req(gearFamilies())
         if(length(gearFamilies()) != 1){#allow user to combine gears within gear families only
             CPUEtext <- as.character("PSD Percentiles - because most gears are strongly size biased, PSDs are only comparable within a single gear type.  Please select one and only one gear to see results.")
           }else if(rowSums(is.na(PSDpercTable()[1,])) < ncol(PSDpercTable())){#only show if first row does not have NA in all columns 
@@ -2841,6 +2880,7 @@ showModal(pick_Database) #activate above modal
     if(!is.null(input$stockspp)){
       stockinfo <- stockinfo[stockinfo$Species %chin% c(input$stockspp),]
     }
+      stockinfo <- stockinfo %>% mutate(Number=format(round(as.numeric(Number),0), big.mark = ","))
       stockinfo <- stockinfo %>% select(1:11)
       colnames(stockinfo) <- c("Year", "Date Stocked", "Water Body", "Stocking Site", "Species", "Number Stocked",
                                "Weight (lb)",  "Size (in)", "Fish/lb", "Hatchery (origin)", "Mortality (%)")
@@ -2851,10 +2891,10 @@ showModal(pick_Database) #activate above modal
 
   #render stocking info table
     output$stocktable <- DT::renderDataTable(
-    if(!is.null(input$stocklake) | !is.null(input$stockspp))  
-      stockinfo(), rownames = FALSE, 
+      if(!is.null(input$stocklake) | !is.null(input$stockspp))
+        stockinfo(), rownames = FALSE,
       options = list(pageLength = 50)
-  ) 
+    )
   
   #Downloadable csv of stocking information table
   output$downstocking <- downloadHandler(
