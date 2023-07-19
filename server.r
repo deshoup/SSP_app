@@ -10,6 +10,8 @@ library(tibble)
 library(rlang) #is_empty() which catches NULL values, but also other forms of null like conditions not caught by is.null()
 library(data.table) #used for fread, which is faster way to load .csv files
 library(fst)#for loading fst saved files
+library(ggplot2)
+library(cowplot)
 # library(periscope)#trying this to make downloadable figures
 
 
@@ -130,7 +132,7 @@ showModal(pick_Database) #activate above modal
            removeModal()
            showModal(NoDataLoaded) 
          }else{
-         mainDataRead <- as.data.table(fread(input$loadedSampleData$datapath))
+         mainDataRead <- fread(input$loadedSampleData$datapath)
             mainDataRead[mainDataRead == "."] <- NA
             #deal with Verified.?? columns if they exist
             if("Verified.TL.Wr" %in% colnames(mainDataRead)){
@@ -152,6 +154,7 @@ showModal(pick_Database) #activate above modal
                 relocate(Lake.Code, SampleID, Station, Month, Day, Year, Time, Pool.Elevation, Surface.Temp, Secchi, Conductivity, 
                          Gear.Code, Gear.Name, Gear.Length, Habitat, Effort, Species.Code, Species.Name, Number.of.individuals, 
                          TL_mm, Wt_g, Lake.Name, lake.Name_Code, gear.Name_Code, species.Code_Name, .after = last_col()) %>% 
+                as.data.table() %>% 
                 setkey(Lake.Code, Year, Gear.Code, Month)
             # output$dataBeingUsed <- renderText({
             #   return(paste("<span style=\"color:green\">Using uploaded sample data</span>"))
@@ -647,27 +650,25 @@ showModal(pick_Database) #activate above modal
 
     #display text showing matched age dataset in green
     output$yesmatch <- renderText({
-      req(selDataspp(), input$selagelake, input$selageyears, input$selagespp, input$selectspecies, 
-          input$toggleCodeName)
+      req(selDataspp(), input$selagelake, input$selageyears, input$selagespp, input$selectspecies)#,
+      #     input$toggleCodeName)
       if(!is.null(input$selagelake) && !is.null(input$selageyears) && !is.null(input$selagespp) &&
          length(input$selagelake) != 0 && length(input$selageyears) != 0  && length(input$selagespp) != 0 &&
          length(input$selectspecies) !=0){
              if(input$toggleCodeName == TRUE){
-                if(input$selectspecies == input$selagespp &&
-                   selDataspp()$Lake.Code %chin% c(input$selagelake) &&
-                   selDataspp()$Year %in% c(input$selageyears)
-                   ){
-                    yesmatch <- as.character("Matched Age Dataset")
-                    return(yesmatch)
-                }  
+                  if(input$selectspecies == input$selagespp &&
+                     all(selDataspp()$Lake.Code == c(input$selagelake)) &&
+                     all(selDataspp()$Year == c(input$selageyears))
+                     ){
+                      yesmatch <- as.character("Matched Age Dataset")
+                  }
              }else{
-               if(input$selectspecies == input$selagespp &&
-                  selDataspp()$lake.Name_Code %chin% c(input$selagelake) &&
-                  selDataspp()$Year %in% c(input$selageyears)
-                  ){
-                 yesmatch <- as.character("Matched Age Dataset")
-                 return(yesmatch)
-               }  
+                 if(all(input$selectspecies == input$selagespp) &&
+                    all(selDataspp()$lake.Name_Code == c(input$selagelake)) &&
+                    all(selDataspp()$Year == c(input$selageyears))
+                    ){
+                   yesmatch <- as.character("Matched Age Dataset")
+                 }
              }
         }
     })
@@ -678,17 +679,17 @@ showModal(pick_Database) #activate above modal
         if(!is_empty(input$selagelake) && !is_empty(input$selageyears) && !is_empty(input$selagespp) &&
            !is_empty(input$selectspecies) && !is_empty(selDataspp())){
           if(input$toggleCodeName == TRUE){
-            if(input$selectspecies != input$selagespp ||
-               selDataspp()$Lake.Code != input$selagelake ||
-               selDataspp()$Year != input$selageyears)
+            if(any(input$selectspecies != input$selagespp) ||
+               any(selDataspp()$Lake.Code != input$selagelake) ||
+               any(selDataspp()$Year != input$selageyears))
               {
                 nomatch <- as.character("Not a Matched Age Dataset")
                 return(nomatch)
             }
           }else{
-            if(input$selectspecies != input$selagespp ||
-               selDataspp()$lake.Name_Code != input$selagelake ||
-               selDataspp()$Year != input$selageyears){
+            if(any(input$selectspecies != input$selagespp) ||
+               any(selDataspp()$lake.Name_Code != input$selagelake) ||
+               any(selDataspp()$Year != input$selageyears)){
               nomatch <- as.character("Not a Matched Age Dataset")
               return(nomatch)
             }
@@ -1186,17 +1187,17 @@ showModal(pick_Database) #activate above modal
     output$ageDataMatch <- renderText({
       if(!is.null(input$selagelake) && !is.null(input$selageyears) && !is.null(input$selagespp)){
         if(input$toggleCodeName == TRUE){
-          if(input$selectspecies == input$selagespp &&
-             selDataspp()$Lake.Code %chin% c(input$selagelake) &&
-             selDataspp()$Year %in% c(input$selageyears)){
-            ageDataMatch <- as.character("Matched Age Dataset was used")
-          }
+            if(all(input$selectspecies == input$selagespp) &&
+               all(selDataspp()$Lake.Code == c(input$selagelake)) &&
+               all(selDataspp()$Year == c(input$selageyears))){
+              ageDataMatch <- as.character("Matched Age Dataset was used")
+            }
         }else{
-          if(input$selectspecies == input$selagespp &&
-             selDataspp()$lake.Name_Code %chin% c(input$selagelake) &&
-             selDataspp()$Year %in% c(input$selageyears)){
-            ageDataMatch <- as.character("Matched Age Dataset was used")
-          }
+            if(all(input$selectspecies == input$selagespp) &&
+               all(selDataspp()$lake.Name_Code == c(input$selagelake)) &&
+               all(selDataspp()$Year == c(input$selageyears))){
+              ageDataMatch <- as.character("Matched Age Dataset was used")
+            }
         }
       }
     })
@@ -1204,14 +1205,14 @@ showModal(pick_Database) #activate above modal
     output$ageDataNoMatch <- renderText({
       if(!is.null(input$selagelake) && !is.null(input$selageyears) && !is.null(input$selagespp)){
         if(input$toggleCodeName == TRUE){
-          if(input$selectspecies != input$selagespp ||
-             selDataspp()$Lake.Code != input$selagelake ||
-             selDataspp()$Year != input$selageyears){
+          if(any(input$selectspecies != input$selagespp) ||
+             any(selDataspp()$Lake.Code != input$selagelake) ||
+             any(selDataspp()$Year != input$selageyears)){
             ageDataNoMatch <- as.character("Age Dataset was NOT a Match to Sample Dataset")}
         }else{
-          if(input$selectspecies != input$selagespp ||
-             selDataspp()$lake.Name_Code != input$selagelake ||
-             selDataspp()$Year != input$selageyears){
+          if(any(input$selectspecies != input$selagespp) ||
+             any(selDataspp()$lake.Name_Code != input$selagelake) ||
+             any(selDataspp()$Year != input$selageyears)){
             ageDataNoMatch <- as.character("Age Dataset was NOT a Match to Sample Dataset")}
         } 
       }
@@ -1355,58 +1356,83 @@ showModal(pick_Database) #activate above modal
     #create standard weight equation for reference
     output$standardequation <- renderTable(rownames = FALSE, digits = 3,{
       if(input$wr == TRUE){
-        standard <- merge(selDataspp(), wsnames, by="Species.Code", all.x = TRUE)
-        wsName <- as.character(standard[1,"wsname"]) 
-        standardeq <- wsVal(wsName)
-        standardeq <- standardeq[c(1,3,4,7:10)]
-        colnames(standardeq) <- c("Species","Model Type","Reference Percentile","Min.TL",
-                                  "Intercept","Slope","Source")
-        standardeq <- mutate(standardeq, Min.TL = as.integer(Min.TL))
+        if(speciesname() == "All crappie spp. combined"){#if not a single spp, should not return table (causes error if no matching Ws data)
+          standardeq <- NULL
+        }else{
+          standard <- merge(selDataspp(), wsnames, by="Species.Code", all.x = TRUE)
+          wsName <- as.character(standard[1,"wsname"]) 
+          standardeq <- wsVal(wsName)
+          standardeq <- standardeq[c(1,3,4,7:10)]
+          colnames(standardeq) <- c("Species","Model Type","Reference Percentile","Min.TL",
+                                    "Intercept","Slope","Source")
+          standardeq <- mutate(standardeq, Min.TL = as.integer(Min.TL))
+        }
+        return(standardeq)
       }
     })  
+  
+    #create conditional helptext for standard weight equation above so we can hide it if no Ws exists for spp
+    output$WsEqDetail <- renderUI({
+      if(speciesname() == "All crappie spp. combined"){
+          helpText({paste("Relative weight cannot be calculated for a group of species because its calculation depends
+                on species-specific standard weights.  You selected '", speciesname(), "'.  Please select a single 
+                species to view relative weight results.")})
+      }else{
+        tagList(
+          hr(),
+          helpText("Details of standard weight equation"),
+          tableOutput("standardequation")
+        )
+      }
+    })
     
     table <- reactive({
       if(input$wr == TRUE){
-        wrpsdjoindata <- merge(gabelseldata(), wsnames, by="Species.Code", all.x = TRUE)
-        #Calculate psd size category and append to selected data
-        psdval <- psdAdd(TL_mm~Gabelhouse.Name, units="mm", data=wrpsdjoindata)
-        wrpsdjoindata$psdvalue <- psdval
-        #Calculate relative weight and append to selected data
-        wrvalue <- wrAdd(Wt_g ~ TL_mm + wsname, units="metric", data = wrpsdjoindata)
-        wrpsdjoindata$wrvalue <- wrvalue
-        #calculated mean, sd, and count aggregated by psd size class
-        wrdfs <- list(
-          aggwrmeans = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, mean, na.action = na.omit),
-          aggwrsds = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, sd, na.action = na.omit),
-          aggwrcounts = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, length, na.action = na.omit)
-        )
-        joinedall <- cbind(wrdfs$aggwrmeans, wrdfs$aggwrsds[2], wrdfs$aggwrcounts[2])
-        colnames(joinedall)[2:4] <- c("Mean", "St.Dev.", "Num")
-        
-        #Calculate standard error and upper/lower confidence levels
-        witherror <- mutate(joinedall, Std.Error = (St.Dev./sqrt(Num)))
-        calculate <- mutate(witherror, Lower.95.CI = Mean - (1.96*Std.Error),
-                            Upper.95.CI = Mean + (1.96*Std.Error),
-                            CV = (St.Dev./Mean)*100)
-        calculate <- calculate[c(1,2,4,8,5,6,7)]
-        colnames(calculate) <- c("Size Category","Mean","Count","CV","SE","L 95% CI","U 95% CI")
-        wtable <- calculate
-        
-        #Calculate overal Wr
-        alldata <- wrpsdjoindata[!(is.na(wrpsdjoindata$wrvalue)),]
-        allmean <- mean(alldata$wrvalue, na.rm = TRUE)
-        allsd <- sd(alldata$wrvalue, na.rm = TRUE)
-        allcount <- length(alldata$wrvalue)
-        overall <- as.character("Overall")
-        all <- data.frame(overall,allmean,allsd,allcount)
-        colnames(all) <- c("Size Category","Mean","St.Dev.","Num")
-        all <- mutate(all, Std.Error = (St.Dev./sqrt(Num)))
-        all <- mutate(all, Lower.95.CI = Mean - (1.96*Std.Error),
-                      Upper.95.CI = Mean + (1.96*Std.Error),
-                      CV = (St.Dev./Mean)*100)
-        all <- all[c(1,2,4,8,5,6,7)]
-        colnames(all) <- c("Size Category","Mean","Count","CV","SE","L 95% CI","U 95% CI")
-        table <- rbind(wtable, all)
+        if(speciesname() == "All crappie spp. combined"){#if not a single spp, should not return table (causes error if no matching Ws data)
+          table <- NULL
+        }else{
+          wrpsdjoindata <- merge(gabelseldata(), wsnames, by="Species.Code", all.x = TRUE)
+          #Calculate psd size category and append to selected data
+          psdval <- psdAdd(TL_mm~Gabelhouse.Name, units="mm", data=wrpsdjoindata)
+          wrpsdjoindata$psdvalue <- psdval
+          #Calculate relative weight and append to selected data
+          wrvalue <- wrAdd(Wt_g ~ TL_mm + wsname, units="metric", data = wrpsdjoindata)
+          wrpsdjoindata$wrvalue <- wrvalue
+          #calculated mean, sd, and count aggregated by psd size class
+          wrdfs <- list(
+            aggwrmeans = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, mean, na.action = na.omit),
+            aggwrsds = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, sd, na.action = na.omit),
+            aggwrcounts = aggregate(wrvalue~psdvalue, data=wrpsdjoindata, length, na.action = na.omit)
+          )
+          joinedall <- cbind(wrdfs$aggwrmeans, wrdfs$aggwrsds[2], wrdfs$aggwrcounts[2])
+          colnames(joinedall)[2:4] <- c("Mean", "St.Dev.", "Num")
+          
+          #Calculate standard error and upper/lower confidence levels
+          witherror <- mutate(joinedall, Std.Error = (St.Dev./sqrt(Num)))
+          calculate <- mutate(witherror, Lower.95.CI = Mean - (1.96*Std.Error),
+                              Upper.95.CI = Mean + (1.96*Std.Error),
+                              CV = (St.Dev./Mean)*100)
+          calculate <- calculate[c(1,2,4,8,5,6,7)]
+          colnames(calculate) <- c("Size Category","Mean","Count","CV","SE","L 95% CI","U 95% CI")
+          wtable <- calculate
+          
+          #Calculate overall Wr
+          alldata <- wrpsdjoindata[!(is.na(wrpsdjoindata$wrvalue)),]
+          allmean <- mean(alldata$wrvalue, na.rm = TRUE)
+          allsd <- sd(alldata$wrvalue, na.rm = TRUE)
+          allcount <- length(alldata$wrvalue)
+          overall <- as.character("Overall")
+          all <- data.frame(overall,allmean,allsd,allcount)
+          colnames(all) <- c("Size Category","Mean","St.Dev.","Num")
+          all <- mutate(all, Std.Error = (St.Dev./sqrt(Num)))
+          all <- mutate(all, Lower.95.CI = Mean - (1.96*Std.Error),
+                        Upper.95.CI = Mean + (1.96*Std.Error),
+                        CV = (St.Dev./Mean)*100)
+          all <- all[c(1,2,4,8,5,6,7)]
+          colnames(all) <- c("Size Category","Mean","Count","CV","SE","L 95% CI","U 95% CI")
+          table <- rbind(wtable, all)
+        }
+        return(table)
       }
     })
     
@@ -1416,6 +1442,19 @@ showModal(pick_Database) #activate above modal
         table()
       }
     }) 
+    
+    #renderUI for ui.r code to display hr(), Wr table, and download button only if not species = 108 (all crappie spp)
+    output$wrTableAndButton <- renderUI({
+      if(speciesname() == "All crappie spp. combined"){
+        NULL
+      }else{
+        tagList(
+          hr(),
+          tableOutput("wrtable"),
+          downloadButton("downwr", "Relative Weight Table")
+        )
+      }
+    })
     
   ##Length-Weight Regression Plot###################################
     lwreg <- function(){
@@ -1607,15 +1646,15 @@ showModal(pick_Database) #activate above modal
       #find min and max length categories within MLR ALK
         agedlencat2 <- lencat(~TLmm, w=w, startcat = 0, right = FALSE, data = selageDatafinal())
         if(input$extrapAge == FALSE){
-            minlencatage2 <- min(agedlencat2$LCat)
+            minlencatage2 <- min(agedlencat2$LCat, na.rm = T)
         }else{
-          #below allows us to use smallest fish observed, whether from age or sample data. Shoul not produce
+          #below allows us to use smallest fish observed, whether from age or sample data. Should not produce
           #any issues because multinomial regression will assume pattern follows for smaller fish, but probably should
-          #not be done if there are huge descrepancies between smallest aged fish and smallest field sampled fish.
-        minlencatage2 <- min(min(agedlencat2$LCat), min(sampledata$LCat))
+          #not be done if there are huge discrepancies between smallest aged fish and smallest field-sampled fish.
+        minlencatage2 <- min(min(agedlencat2$LCat, na.rm = T), min(sampledata$LCat, na.rm = T))
         }
         maxlencatage2 <- max(agedlencat2$LCat)
-      #filter sample dataset to exclude any fish out of bounds of MLR age length key, also if length=NA
+      #filter sample data set to exclude any fish out of bounds of MLR age length key, also if length=NA
         sampledata2 <- filter(sampledata, LCat>(minlencatage2-1), LCat<(maxlencatage2+1), !is.na(LCat))
         sampledatafinal <- transform(sampledata2, TL_mm=as.numeric(TL_mm), Age=as.numeric(Age), LCat=as.numeric(LCat))
       #apply ages to sample
@@ -1631,7 +1670,7 @@ showModal(pick_Database) #activate above modal
                 "agedFishTable", "csv", sep = ".")
         },
         content = function(file) {
-          write.csv(agesample(), file, row.names = TRUE)
+          write.csv(agesample(), file, row.names = F)
         }
       )
       
@@ -1733,7 +1772,7 @@ showModal(pick_Database) #activate above modal
     ##von Bertalanffy Growth Model#################################################
     
     #deal with unit conversion with input$inch check box (mutate TL mm to inches)
-    aged <- eventReactive(input$inch,{
+    aged <- reactive({
       if(input$inch == FALSE){
         aged <- agesample()
       }
@@ -1756,14 +1795,11 @@ showModal(pick_Database) #activate above modal
     })
     
   ###Mean length-at-age plot and von Bert Plot################################################
-    
-    lengthplot <- function(){#using function instead of reactive here because we cannot make a downloadable
-      #figure using a reactive statement, and process of building this plot is too complex...just easier
-      #to have the code below given once rather than recreating it within the download function
+    #generate VB plot and save as object
+    lengthplot <- reactive({
       if(input$growth == TRUE){
         #aggregate mean of each age
           sumfish <- aggregate(TL_mm~Age, data = aged(), mean)
-        
         #von Bert line
           #define FSA function
             vonBfun <- vbFuns()
@@ -1774,39 +1810,44 @@ showModal(pick_Database) #activate above modal
             agesline <- seq(minsampage, maxsampage, length.out = 200)
           #use vonB equation to predict ages for line on plot
             vBline <- vonBfun(agesline, Linf = coef(fitvonB()))
-        #find range of age and TL to define plot boundaries
-          xlimits <- range(aged()$Age)
-          ylimits <- range(aged()$TL_mm)
-        #set margins around plot
-          par(mar=c(6,5,1,4)+0.1)
+          #create data frame of the two above arrays
+            VBlineDF <- data.frame(TL_mm=vBline, Age=agesline)
         
-        #plot 
+        #Build ggplot from above data
         if(input$inch == FALSE){
-          plot(TL_mm~Age, data = aged(), pch = 1, xlab="Age", ylab="Total Length (mm)",
-               cex.lab = 1.5, cex.axis = 1.4)
-        #plot a dashed line through mean length-at-ages
-          points(TL_mm~Age, data = sumfish, pch = 17, cex = 2.2)
-          lines(vBline~agesline, lwd=2)
-          legend('bottomright',c('Mean Length','von Bert'),
-                 lty=c(NA,1),pch=c(17,NA), lwd=2, cex=1.3, pt.cex = 2, ncol = 1)
+          vbplot <- ggplot(aged(), aes(x=Age, y=TL_mm))+
+            geom_point(shape=1, size=3) +
+            geom_point(data=sumfish, aes(color = 'Mean Length'), shape=17, size=6)+ #color= forces this into legend
+            geom_line(data=VBlineDF, y=vBline, aes(color='von Bert'), linewidth = 1.25)+ #color= forces this into legend
+            scale_color_manual(name = "", values = c('von Bert' = 'black', 'Mean Length' = 'black'),
+                guide = guide_legend(override.aes = list(linetype = c(0,1), linewidth= c(0,1.25), shape = c(17,NA),size = 6)))+
+                #guide forces legend with a shape for first item and line for second item...this is easiest way to avoid them getting combined as a line with triangle on it
+            labs(y="Total Length (mm)", x="Age (yr)")+
+            scale_x_continuous(n.breaks=(maxsampage-minsampage))+
+            theme_cowplot(font_size = 19)+
+            theme(legend.position = c(0.79, 0.15), legend.text=element_text(size=17))
         }
         if(input$inch == TRUE){
-          plot(TL_mm~Age, data = aged(), pch = 1, xlab="Age", ylab="Total Length (in)",
-               cex.lab = 1.5, cex.axis = 1.4)
-        #plot a dashed line through mean length-at-ages
-          points(TL_mm~Age, data = sumfish, pch = 17, cex = 2.2)
-          lines(vBline~agesline, lwd=2)
-          legend('bottomright',c('Mean Length','von Bert'),
-                 lty=c(NA,1),pch=c(17,NA), lwd=2, cex=1.3, pt.cex = 2, ncol = 1)
+          vbplot <- ggplot(aged(), aes(x=Age, y=TL_mm))+
+            geom_point(shape=1, size=3) +
+            geom_point(data=sumfish, aes(color = 'Mean Length'), shape=17, size=6)+
+            geom_line(data=VBlineDF, y=vBline, aes(color='von Bert'), linewidth = 1.25)+
+            scale_color_manual(name = "", values = c('von Bert' = 'black', 'Mean Length' = 'black'),
+                guide = guide_legend(override.aes = list(linetype = c(0,1), linewidth= c(0,1.25), shape = c(17,NA),size = 6)))+
+            labs(y="Total Length (in)", x="Age (yr)")+
+            scale_x_continuous(n.breaks=(maxsampage-minsampage))+
+            theme_cowplot(font_size = 19)+
+            theme(legend.position = c(0.79, 0.15), legend.text=element_text(size=17))
         }
-      }
-    }
+        return(vbplot)
+        }
+    })
     
     #render mean length at age plot
     output$meanlengthplot <- renderPlot(bg="transparent", {
       if(input$growth == TRUE){
-        lengthplot()
-      }
+            print(lengthplot())
+          }
     })
     
     #Download png of Growth Metrics plot
@@ -1815,8 +1856,8 @@ showModal(pick_Database) #activate above modal
         paste(input$selectlake,input$selectyear,input$selectgear, input$selectspecies,
               "MeanLength", "png", sep = ".")},
       content = function(file){
-        png(file, width = 600, height = 450)
-        lengthplot()
+        png(file, width = 675, height = 450)
+        print(lengthplot())
         dev.off()
       })
         
