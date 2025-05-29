@@ -13,9 +13,9 @@ stockingData <- read.fst("stockingData.fst", as.data.table = TRUE)
 
 #start main ui.r code#########
 fluidPage(
+  useShinyjs(),
   tags$head(tags$link(rel = "icon", type = "image/png", href = "ODWClogo.gif"),
             tags$title("OK Fishery Analysis App")),
-  useShinyjs(),
   
   tags$head(tags$style(".shiny-progress {color:blue; font-size:200%; font-style: italic;}")),
   tags$head(tags$style(".shiny-notification {position:fixed; top:40% ;left:30%; font-size:200%; 
@@ -28,12 +28,13 @@ fluidPage(
     wellPanel(
         fluidRow(
           
-          
    # profvis_ui("profiler"), adds button to start profiling for debugging and speed measurement
         column(3,align="center", img(src="ODWClogo.gif", height="auto", width="100px")),
-        column(6, align="center", h2("Oklahoma Fishery Analysis Application"),
+        column(6, align="center", tags$b(h2(HTML(paste0(
+          "OK Fishery Analysis App<sup style='font-size: 0.3em; vertical-align: super;'>© ",
+          paste0("2018-",format(Sys.Date(), "%Y")),"</sup>")))),
                hr(), 
-               h5("Created by Dray D. Carl and Daniel E. Shoup")),
+               h5("Created by Daniel E. Shoup and Dray D. Carl")),
               #below line vertically centers OSU logo...sets height to 110 px
                tags$style(HTML('
                       .verticalcenter {
@@ -85,7 +86,7 @@ fluidPage(
               wellPanel(        
                 h4("Sample Selection Summary"),
                 hr(),
-                  h4(textOutput("clearBoxesButton")),
+                  # h4(textOutput("clearBoxesButton")),
                   h4(textOutput("lakename")),
                   h4(textOutput("year")),
                   h4(textOutput("month")),
@@ -126,27 +127,22 @@ fluidPage(
               hr(),  
               sidebarPanel(width=12,
                 fluidRow(    
-                  
-                  #catch metrics & selected sample column
+                  #Selected sample column & box to upload age data
                   column(4, 
                     wellPanel(
-                      h4("Catch Analyses Metrics", align="center"),
-                      hr(),
-                      wellPanel(
-                        checkboxInput("abiotic", "Abiotic Metrics", value = TRUE), 
-                        checkboxInput("samplesize", "Sample Size", value = TRUE),
-                        checkboxInput("totaleffort", "Total Effort", value = TRUE),
-                        checkboxInput("cpue", "CPUE", value = TRUE),
-                        checkboxInput("cpuesize", "CPUE by Size Category", value=TRUE)
-                      ),
-                      helpText("Catch Analysis Output tab includes all species.")
+                         h4("Alternatively, upload your own age data"),
+                         helpText("Must have correct .csv format and column headings"),
+                         fileInput("loadedageData", "Upload Age Data"),
+                         checkboxInput("loadageCheck", "Check to use uploaded age data", value = FALSE),
+                         # hr()
                     ),
                     wellPanel(
                       h4("Selected Sample Data", align="center"),
                       hr(),
                         h4(textOutput("lakename3")),
                         h4(textOutput("year3")),
-                        h4(textOutput("month3")),
+                        h4(textOutput("monthRange")),
+                        # h4(textOutput("month3")),
                         h4(textOutput("gearname3")),
                         h4(textOutput("speciesname3")),
                       hr(),
@@ -191,16 +187,31 @@ fluidPage(
                           selectizeInput("selageyears", "Select Year(s) to pick age data for analysis:", choices = NULL,
                               multiple = TRUE, options = list(placeholder = "click/type here")),
                           helpText("All three selection boxes are required to select age dataset and are
-                                   selected hierarchiaclly (species, then lake, then year."),
-                          helpText("Multiple selections are allowed in Lake and Year fields."),
+                                   selected hierarchiaclly (species, then lake, then year, and finaly month)."),
+                          helpText("Multiple selections are allowed in Lake, Year, and Month fields. However,
+                                   month data should not span a long enough interval that fish growth would 
+                                   bias the length-age relationship. By default the app looks for age data
+                                   within the same 3 month windows as the sampling data (i.e., it is from
+                                   the same season or quarter of the year)"),
                           helpText("Age dataset will appear below once all three boxes are populated."),
                         downloadButton("downagedata", "Download Selected Age Data")
                     )
                    ),
                   
-                  #Single Species Analyses Metrics checkbox column
+                  
+                  
+                  #Metrics checkbox column
                    column(4,
                     wellPanel(
+                    h4("Catch Analyses Metrics (all spp)", align="center"),
+                    hr(),
+                      checkboxInput("abiotic", "Abiotic Metrics", value = TRUE), 
+                      checkboxInput("samplesize", "Sample Size", value = TRUE),
+                      checkboxInput("totaleffort", "Total Effort", value = TRUE),
+                      checkboxInput("cpue", "CPUE", value = TRUE),
+                      checkboxInput("cpuesize", "CPUE by Size Category", value=TRUE)
+                    ),
+                  wellPanel(
                       h4("Single-Species Analyses Metrics", align="center"),
                         hr(),
                         h4("Length and Weight Metrics"),
@@ -216,15 +227,11 @@ fluidPage(
                           checkboxInput("agelengthkey", "Age-Length Key", value = TRUE),
                           checkboxInput("agefreq", "Age-Frequency Histogram", value = TRUE),
                           checkboxInput("growth", "Growth Metrics Plot", value = TRUE),
+                          checkboxInput("vonbert", "Von Bertalanffy Equation", value = TRUE),
                           checkboxInput("meanlength", "Mean Length-at-Age", value = TRUE),
                           checkboxInput("meanweight", "Mean Weight-at-Age", value = TRUE),
-                          checkboxInput("vonbert", "Von Bertalanffy Equation", value = TRUE),
-                          checkboxInput("mort", "Catch Curve (Mortality)", value = TRUE),
-                      hr(),
-                      h4("Alternatively, upload your own age data"),
-                      helpText("Must have correct .csv format and column headings"),
-                      fileInput("loadedageData", "Upload Age Data"),
-                      checkboxInput("loadageCheck", "Check to use uploaded age data", value = FALSE)
+                          checkboxInput("mort", "Mortality, theoretical max age, and recruitement metrics", value = TRUE)
+                      
                     )
                   )
                 )  
@@ -247,7 +254,8 @@ fluidPage(
                       hr(),
                       h4(textOutput("lakename2")),
                       h4(textOutput("year2")),
-                      h4(textOutput("month2")),
+                      # h4(textOutput("month2")),
+                      h4(textOutput("monthRange")),
                       h4(textOutput("gearname2"))
                     ),
                     wellPanel(
@@ -274,20 +282,38 @@ fluidPage(
                       h4("Total CPUE"), 
                       hr(),
                         tableOutput("totcpue"),
-                      hr(),
-                      h4("CPUE by Size Category"),
-                      hr(),
-                      h4(helpText("Size Category References (mm)")),
-                        tableOutput("sizerefmm"),
-                      h4(helpText("Size Category References (in)")),
-                        tableOutput("sizerefin"),
-                      hr(),
-                        h4(helpText("CPUE by Size Category")),
-                        tableOutput("cpuebysize"),
+                      hidden(
+                        div(id="CPUEbyPSD_length",
+                          hr(),
+                          h4("CPUE by Size Category"),
+                          
+                          actionButton("CPUEbySize_PSD_inch", "Change table to CPUE by inch or mm class"),
+                            hidden(
+                              div(id="CPUEbyLength",
+                                fluidRow(
+                                  hr(),
+                                  column(2,numericInput("CPUElengthbin", "Bin width (inch)",
+                                            value = 2,min = 0.1, max = 20, width = '200px')), 
+                                  column(3,numericInput("CPUEMinBin", "Starting Bin", value = NULL, #set value server side
+                                                        min = 0, max = 1270, width = '350px')),
+                                  column(5,checkboxInput("InchCPUE", "Uncheck to give length bin in mm", 
+                                                         value = TRUE)) 
+                                  # uiOutput("CPUEMinBin"),
+                                )
+                              )
+                            ),
+                          uiOutput("CPUEbySizeTable"),
+                        )
+                      ),
                       hr(),
                       h4("Catch Analysis Tab Downloads"),
-                      downloadButton("downcpue", "Total CPUE Table"),
-                      downloadButton("downcpuebysize", "CPUE by Size Table")
+                      div(id="noCPUEbyLength_downld",
+                        downloadButton("downcpue1", "Total CPUE Table"),
+                      ),
+                      div(id="CPUEbyLength_downld",
+                        downloadButton("downcpue2", "Total CPUE Table"),
+                        downloadButton("downcpuebysize", "CPUE by Size Table")
+                      )
                     )       
                   )
                 )
@@ -303,45 +329,39 @@ fluidPage(
         mainPanel(width=12, 
           fluidRow(     
             
-            #Length & weight and size structure colom on left
+            #Length & weight and size structure column on left
             column(6,  
               wellPanel(
                 h3(textOutput("sampleline")),
                     span(textOutput("uploadedAgeData"), style="color:orange"),
                     span(textOutput("ageDataMatch"), style="color:green"),
                     span(textOutput("ageDataNoMatch"), style="color:red"),
-                    textOutput("ageDataCount")
+                    textOutput("ageDataCount"),
+                    textOutput("sampleDataSppCount"),
+                    checkboxInput("addSPPfig", "Check to add species name to figures", value = TRUE)
               ),
               wellPanel(
                 h3("Length and Weight Metrics"),
                   hr(),
                     h4("Length-Frequency Histogram"),
                     plotOutput("lengthhist"),
-                    numericInput("lengthbin", "Length Bin Grouping (mm)", value = 10, min = 1,
-                                 max = 200, width = '180px'),
-                    helpText("Enter desired length bin grouping: default is 10 mm."),
-                    helpText("Enter 25.4 mm for 1-inch groupings"),
+                checkboxInput("inchLF", "Display length-frequency in inches (checked) or mm (unchecked)", 
+                                 value = FALSE),
+                helpText("Default is metric (mm). Checkbox changes units to inches"),
+                    uiOutput("lengthbin_ui"),
+                    helpText("Enter desired length bin grouping: default is 10 mm (0.4 inch)."),
                   br(),
                   downloadButton("downlfplot","Length-Frequency Plot"),
                   downloadButton("downlftable", "Length-Frequency Tabular Data"),
                   hr(),
                     h4("Proportional Size Distribution (PSD)"),
                   hr(),
-                    h4(helpText(textOutput("speciesref"))),
-                    helpText("References of lengths for PSD size categories"),
-                    tableOutput("psdvaltable"),
-                    tableOutput("psdtable"),
-                    downloadButton("downpsd", "PSD Table"),
-                br(),
+                    uiOutput("PSDoutputDetails"),
+                # br(),
                   hr(),
                     h4("Relative Weight (Wr)"),
-                  # hr(),
-                    uiOutput("WsEqDetail"),#produces text for "Details of standard weight equation" (or error if spp code 108, all crappie, is used)
-                    # tableOutput("standardequation"),
-                  # hr(),
-                  #   tableOutput("wrtable"),
-                  #   downloadButton("downwr", "Relative Weight Table"),
                     uiOutput("wrTableAndButton"),
+                    uiOutput("WsEqDetail"),#produces text for "Details of standard weight equation" (or error message if spp does not have Ws equation)
                   br(),
                   hr(),
                     h4("Length-Weight Regression"),
@@ -349,13 +369,13 @@ fluidPage(
                     downloadButton("downLWregplot","Length-Weight Regression Plot"),
                   br(),
                   br(),
-                    tableOutput("lwcoef"),
+                    tableOutput("lwcoef"), #length-weight coefficients and regression plot
                   hr(),
-                    h4("Max Length and Weight"),
-                  hr(),
-                    tableOutput("maxspptab"),
-                  # hr(),
-                  # h4("Length-Weight Downloads"),
+                div(id="MaxLnWt",
+                      h4("Max Length and Weight"),
+                    hr(),
+                      tableOutput("maxspptab")
+                )
               )
             ),
             
@@ -364,84 +384,107 @@ fluidPage(
               wellPanel(
                 h3("Population Dynamics"),
                   hr(),
-                    h4("Selected Age-Length Key"),
-                    plotOutput("alkplot"),
-                    # downloadablePlotUI("alkplot2", downloadtypes = c("png")),
-                    h4(checkboxInput("extrapAge", "extrapolate age-length key to fish smaller than smallest individual aged.",
-                                     value = T)),
-                  hr(),
-                    downloadButton("obsALK","Observed Age-Length Key"),
-                    downloadButton("smoothALK","Smooth Age-Length Key"),
-                    downloadButton("downALKplot","Age-Length Key Plot"),
-                    downloadButton("agedfishtable", "Table with ages assigned to fish"),
-                  hr(),
-                    h4("Age Frequency Histogram"),
-                    plotOutput("agefreqhist"),
-                    downloadButton("downafplot","Age-Frequency Plot"),
-                  # renderUI("lineBrk"),
-                  br(),
-                  br(),
-                  br(),
-                    h4("Growth Metrics"),
-                    helpText("Mean Length-at-Age and von Bertalanffy Growth Equation"),
-                    h4(checkboxInput("inch", "Display Measurements in English Units (in & lbs)", value = FALSE)),
+                  div(id="alk",
+                    h4("Age-Length Key"),
+                        fluidRow(
+                          column(3, actionButton("smoothALKToggle", "Change figure to smoothed ALK"), 
+                                 style = "margin-right: 60px;"),
+                          column(3, actionButton("alkPlotToggle", "Change figure to bubble plot")),
+                        ),
+                        textOutput("Sm_obs_extrapMessage"),
+                        h4(checkboxInput("extrapAge", "Extrapolate smoothed age-length key to fish smaller than smallest individual aged.",
+                                         value = F)),#server-side updateCheckboxInput will override this once age data are loaded
+                        helpText("Extrapoation should only be done in cases where you aged enough age-0 fish (i.e., you found the size below which fish are >50% age-0)."),
+                        plotOutput("alkplot"),
+                        div(id="ageTextChkbx",
+                          checkboxInput("ageTextFig", "Uncheck to remove age values from plot bars", 
+                                  value = T)
+                        ),
+                        uiOutput("ageFigTextBox"),
+                        downloadButton("downALKplot","Age-Length Key Plot"),
+                        downloadButton("obsALK","Observed Age-Length Key (table)"),
+                        downloadButton("smoothALK","Smooth Age-Length Key (table)"),
+                        downloadButton("agedfishtable", "Table with ages assigned to fish"),
+                      hr()
+                  ),
+                  div(id="ageFreqInfo",
+                        h4("Age Frequency Histogram"),
+                        plotOutput("agefreqhist"),
+                        downloadButton("downafplot","Age-Frequency Plot"),
+                      br(),
+                      br(),
+                      br()
+                  ),
+                    h3("Growth Metrics"),
+                    h4(checkboxInput("inch", "Display Growth Metrics in English Units (in & lbs)", value = FALSE)),
                     helpText("Default is metric (mm and g). Checkbox changes units to in. and lbs."),
-                    plotOutput("meanlengthplot"),
-                    downloadButton("downmeanplot","von Bertalanffy plot"),
                   br(),
-                  br(),
-                  br(),
-                    helpText("Mean Length-at-Age"),
-                    tableOutput("meanlengthtable"),
-                    downloadButton("downML", "Mean Length-at-Age Table"),
-                  br(),
-                  br(),
-                  br(),
-                    helpText("Mean Weight-at-Age"),
-                    tableOutput("meanweighttable"),
-                    downloadButton("downMW", "Mean Weight-at-Age Table"),
-                  br(),
-                  br(),
-                  br(),
-                    helpText("von Bertalanffy Growth Equation"),
-                    tableOutput("vonBcoef"),
-                    downloadButton("downvonBcoef", "von Bert Equation Table"),
-                  br(),
-                  br(),
-                  br(),
-                    h4("Catch Curve (Mortality)"),
-                    plotOutput("catchcurve"),
-                    downloadButton("downmort", "Catch Curve Plot"),
-                  br(),
-                  br(),
-                  br(),
-                    tableOutput("mortalitytable"),
-                    downloadButton("downmorttable", "Mortality Table"),
-                  br(),
-                  br(),
-                  br(),
-                textOutput("TheorMaxAge"),
-                textOutput("ObsMaxAge"),
-                
-                  hr(),
-                    h4("Estimates of natural mortality (and resulting fishing mortality)"),
-                    helpText("Estimates of natural mortality (M) are based on the fact that M often correlates with theoretical 
-                             max age (Hoenig NLS approach) or von Bertalanffy values (Pauly NLS-T approach).  Fishing
-                             mortality is then calculated as total mortality minus natural mortality. The Hoenig NLS method should 
-                             be preferred when available as it produces the most consistently accurate results (Then et al. 
-                             2015), but Pauly NLS-T can be used in cases where theoretical maximum age cannot be calcualted 
-                             but von Bertalanffy curve parameters are available.  If fishing mortality is negative, it is 
-                             a sign that the estimated natural mortality was already larger than total mortality...suggesting 
-                             the estimated natural mort was not a good fit to these data (and/or that most mortality is 
-                             caused by natural mortality)."),
-                    tableOutput("natMortalityTable"),
-                    helpText(""),
-                
-                  # hr(),
-                  # h4("Population Dynamics Downloads"),
-                downloadButton("downNatmorttable", "Est Nat Mortality Table")
-                  
+                  div(id="vonbertInfo",
+                      h4("von Bertalanffy Figure"),
+                        plotOutput("meanlengthplot"),
+                        fluidRow(
+                        downloadButton("downmeanplot","von Bertalanffy plot"),
+                        actionButton("CI_PIinfo", "Click for info about CI and prediction interval")
+                        ),
+                      br(),
+                      br(),
+                      br(),
+                      h4("von Bertalanffy Growth Equation"),
+                        tableOutput("vonBcoef"),
+                        uiOutput("vonBerror"), #handles nls fitting errors in VB equation
+                        downloadButton("downvonBcoef", "von Bert Equation Table"),
+                      br(),
+                      br(),
+                      br()
+                  ),
+                  div(id="meanLengthAge",
+                      h4("Mean Length-at-Age"),
+                        tableOutput("meanlengthtable"),
+                        downloadButton("downML", "Mean Length-at-Age Table"),
+                      br(),
+                      br(),
+                      br()
+                  ),
+                  div(id="meanWeightAge",
+                      h4("Mean Weight-at-Age"),
+                        tableOutput("meanweighttable"),
+                        downloadButton("downMW", "Mean Weight-at-Age Table"),
+                      br(),
+                      br(),
+                      br()
+                  ),
+                  div(id="mortMetrics",  
+                        h4("Catch Curve (Mortality)"),
+                        plotOutput("catchcurve"),
+                      helpText("Shaded band in figure above is 95% confidence interval for the slope. True slope (mortality) could be 
+                               any angle that fits within this shaded range."),
+                        downloadButton("downmort", "Catch Curve Plot"),
+                      br(),
+                      br(),
+                      hr(),
+                        tableOutput("mortalitytable"),
+                        downloadButton("downmorttable", "Mortality Table"),
+                      br(),
+                      br(),
+                      hr(),
+                    tableOutput("TheorMaxAge"),                  
+                    h5(textOutput("ObsMaxAge")),
                     
+                      hr(),
+                        h4("Estimates of natural mortality (and resulting fishing mortality)"),
+                        helpText("Note: If fishing mortality is negative, it is 
+                                 a sign that 1) estimate of natural or total mortality was not very accurate or 2) exploitation (fishing mortality) was 
+                                 small and accounts for most of total mortality"),
+                        actionButton("NatMort_MoreInfo", "More Info"),
+                        tableOutput("natMortalityTable"),
+                        helpText(""),
+                    downloadButton("downNatmorttable", "Est Nat Mortality Table"),
+                    hr(),
+                    h4("Year class strength (Maceina 1997 Fish Res 32:115-121)"),
+                    actionButton("YCstrength_MoreInfo", "More Info about yr class strength"),
+                    uiOutput("YCstrengthPlt"),
+                    downloadButton("downYCstrengthPlt", "Year class strength plot")
+                  )
               )
             )
           )
@@ -714,7 +757,8 @@ fluidPage(
             fluidRow(
               column(2),
               column(8, align="center",
-                 tags$iframe(style="height:700px; width:100%",
+               #tags$iframe(style="height:700px; width:100%",#1300
+               tags$iframe(style="height:1300px; width:100%",
                    src="odwc.ssp.ofaa.pdf#page=1&view=FitH")
                     )      
             )        
